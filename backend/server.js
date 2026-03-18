@@ -5,7 +5,8 @@ const { Pool } = require("pg");
 const { z } = require("zod");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-require("dotenv").config();
+const path = require('path');
+require("dotenv").config({ path: path.join(__dirname, '.env') });
 
 
 const app = express();
@@ -15,7 +16,6 @@ app.use(express.json());
 // ─── DB Pool ──────────────────────────────────────────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // ← needs this for Supabase
   max: 10,
   idleTimeoutMillis: 30000,
 });

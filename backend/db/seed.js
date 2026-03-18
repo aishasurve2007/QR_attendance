@@ -1,11 +1,10 @@
 // seed.js — run with: node seed.js
-const { Pool } = require("pg");
-require('dotenv').config({ path: '../.env' });
-
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }  // ← this line is required for Supabase
 });
 
 async function seed() {
