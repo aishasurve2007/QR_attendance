@@ -780,18 +780,25 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
       <Modal open={!!showQR} onClose={() => setShowQR(null)} title={`${attendeeLabel} QR Code`}>
         {showQR && (
           <div style={{ textAlign: "center" }}>
-            <div style={{
-              display: "inline-flex", padding: 20, background: "#fff", borderRadius: 16,
-              border: "2px solid #f0f0f0", marginBottom: 16,
-            }}>
-              <QRCode value={showQR.id} size={160} />
-            </div>
+            <div id="qr-modal-canvas" style={{
+  display: "inline-flex", padding: 20, background: "#fff", borderRadius: 16,
+  border: "2px solid #f0f0f0", marginBottom: 16,
+}}>
+  <QRCode value={showQR.id} size={160} />
+</div>
             <p style={{ fontWeight: 800, fontSize: 17, margin: "0 0 4px", fontFamily: "'Playfair Display', serif" }}>{showQR.name}</p>
             <p style={{ color: "#888", margin: "0 0 4px", fontSize: 13 }}>{showQR.roll || showQR.identifier} · {showQR.dept || showQR.group_label}</p>
             <p style={{ color: "#bbb", margin: 0, fontFamily: "'DM Mono', monospace", fontSize: 12 }}>ID: {showQR.id}</p>
             <div style={{ marginTop: 20 }}>
-              <Btn variant="primary">⬇ Download QR</Btn>
-            </div>
+  <Btn variant="primary" onClick={() => {
+    const canvas = document.querySelector("#qr-modal-canvas canvas");
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `${showQR.name}-QR.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }}>⬇ Download QR</Btn>
+</div>
           </div>
         )}
       </Modal>
