@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
+import QRCodeLib from "qrcode";
+import { BrowserQRCodeReader } from "@zxing/browser";
 
 // ─── Org Config Context ───────────────────────────────────────────────────────
 const OrgContext = createContext({
@@ -89,51 +91,20 @@ function TableSkeleton({ rows = 5, cols = 4 }) {
 }
 
 // ─── Inline QR code SVG generator ────────────────────────────────────────────
-function generateQRPattern(data) {
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = ((hash << 5) - hash + data.charCodeAt(i)) | 0;
-  }
-  const size = 21;
-  const cells = [];
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      const inFinder =
-        (r < 7 && c < 7) || (r < 7 && c >= size - 7) || (r >= size - 7 && c < 7);
-      if (inFinder) {
-        const lr = r % 7, lc = c % 7;
-        const isOuter = lr === 0 || lr === 6 || lc === 0 || lc === 6;
-        const isInner = lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4;
-        cells.push(isOuter || isInner ? 1 : 0);
-      } else {
-        const bit = (Math.abs((hash * (r * size + c + 1) * 2654435761) | 0) >> 4) & 1;
-        cells.push(bit);
-      }
-    }
-  }
-  return { cells, size };
-}
-
 function QRCode({ value, size = 120 }) {
-  const { cells, size: s } = generateQRPattern(value);
-  const cell = size / s;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ borderRadius: 4 }}>
-      <rect width={size} height={size} fill="white" />
-      {cells.map((v, i) =>
-        v ? (
-          <rect
-            key={i}
-            x={(i % s) * cell}
-            y={Math.floor(i / s) * cell}
-            width={cell}
-            height={cell}
-            fill="#0a0a0a"
-          />
-        ) : null
-      )}
-    </svg>
-  );
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (canvasRef.current && value) {
+      QRCodeLib.toCanvas(canvasRef.current, value, {
+        width: size,
+        margin: 2,
+        color: { dark: "#0a0a0a", light: "#ffffff" }
+      }).catch(err => console.error("QR generation error:", err));
+    }
+  }, [value, size]);
+
+  return <canvas ref={canvasRef} style={{ borderRadius: 4 }} />;
 }
 
 // ─── Mock data fallback (used when API unavailable) ──────────────────────────
@@ -397,6 +368,44 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState(null);
+  const scannerRef = useRef(null);
+const [cameraActive, setCameraActive] = useState(false);
+
+async function startCamera() {
+  try {
+    setCameraActive(true);
+    setScanMsg(null);
+
+    const { Html5Qrcode } = await import("html5-qrcode");
+    
+    const scanner = new Html5Qrcode("qr-reader");
+    scannerRef.current = scanner;
+
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => {
+        setScanInput(decodedText);
+        setScanMsg({ type: "success", text: `✓ QR Scanned!` });
+        stopCamera();
+      },
+      (error) => {}
+    );
+  } catch (e) {
+    setScanMsg({ type: "error", text: "Camera error: " + e.message });
+    setCameraActive(false);
+  }
+}
+
+async function stopCamera() {
+  try {
+    if (scannerRef.current) {
+      await scannerRef.current.stop();
+      scannerRef.current = null;
+    }
+  } catch {}
+  setCameraActive(false);
+}
 
   async function handleSave() {
     if (!form.name || !form.date) return;
@@ -526,15 +535,32 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
         </div>
       </Modal>
 
-      <Modal open={!!showScanner} onClose={() => setShowScanner(null)} title={`Check-in: ${events.find(e => e.id === showScanner)?.name}`}>
+      <Modal open={!!showScanner} onClose={() => { setShowScanner(null); stopCamera(); }} title={`Check-in: ${events.find(e => e.id === showScanner)?.name}`}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           <div style={{
-            background: "#f8f7ff", border: "2px dashed #c4b5fd", borderRadius: 16,
-            padding: 24, marginBottom: 16,
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>📷</div>
-            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>In a real deployment, this would activate the device camera.<br />For demo, enter Attendee ID or Identifier below.</p>
-          </div>
+  background: "#f8f7ff", border: "2px dashed #c4b5fd", borderRadius: 16,
+  padding: 16, marginBottom: 16,
+}}>
+  {cameraActive ? (
+  <div>
+    <div id="qr-reader" style={{ width: "100%", borderRadius: 10 }} />
+    <Btn small variant="danger" onClick={stopCamera}
+      style={{ marginTop: 10, width: "100%" }}>
+      Stop Camera
+    </Btn>
+  </div>
+) : (
+  <div style={{ textAlign: "center", padding: 16 }}>
+    <div style={{ fontSize: 48, marginBottom: 8 }}>📷</div>
+    <p style={{ color: "#888", fontSize: 13, margin: "0 0 12px" }}>
+      Click below to activate camera and scan a QR code
+    </p>
+    <Btn variant="primary" onClick={startCamera}>
+      Start Camera
+    </Btn>
+  </div>
+)}
+</div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <input
@@ -961,28 +987,50 @@ function SettingsView({ orgId, setOrgConfig, apiAvailable }) {
   const [apiError, setApiError] = useState(null);
 
   async function handleSave() {
-    setSaving(true);
-    setApiError(null);
-    setSaved(false);
-    try {
-      if (apiAvailable) {
-        await apiFetch(`${BASE_URL}/orgs/${orgId}`, {
-          method: "PATCH",
-          body: {
-            name: form.orgName,
-            attendee_label: form.attendeeLabel,
-          }
-        });
+  if (!form.name || !form.date) return;
+  setSaving(true);
+  setApiError(null);
+  try {
+    console.log("FORM DATA:", form);
+    // map form fields to backend field names
+    const payload = {
+      name: form.name,
+      event_date: form.date,
+      event_time: form.time,
+      location: form.location,
+      organizer: form.organizer,
+    };
+
+    if (apiAvailable) {
+      if (editId) {
+        const updated = await apiFetch(
+          `${BASE_URL}/orgs/${orgId}/events/${editId}`, 
+          { method: "PUT", body: payload }
+        );
+        setEvents(ev => ev.map(e => e.id === editId ? { ...e, ...updated } : e));
+      } else {
+        const created = await apiFetch(
+          `${BASE_URL}/orgs/${orgId}/events`, 
+          { method: "POST", body: payload }
+        );
+        setEvents(ev => [...ev, created]);
       }
-      setOrgConfig(form);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
-      setApiError(e.message);
-    } finally {
-      setSaving(false);
+    } else {
+      if (editId) {
+        setEvents(ev => ev.map(e => e.id === editId ? { ...e, ...form } : e));
+      } else {
+        setEvents(ev => [...ev, { id: "EVT" + uid(), ...form }]);
+      }
     }
+    setForm({ name: "", date: "", time: "", location: "", organizer: "" });
+    setEditId(null);
+    setShowCreate(false);
+  } catch (e) {
+    setApiError(e.message);
+  } finally {
+    setSaving(false);
   }
+}
 
   return (
     <div>

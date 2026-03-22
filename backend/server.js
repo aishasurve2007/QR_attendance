@@ -287,6 +287,7 @@ api.get("/orgs/:orgId/events", async (req, res) => {
 
 api.post("/orgs/:orgId/events", async (req, res) => {
   try {
+    console.log("EVENT BODY RECEIVED:", req.body); // ← add this
     const data = EventSchema.parse(req.body);
     const org = await resolveOrg(req.params.orgId);
     const { rows } = await query(
@@ -355,9 +356,11 @@ api.post("/orgs/:orgId/events/:id/checkin", async (req, res) => {
     let attendeeId = data.attendee_id;
     if (!attendeeId && data.identifier) {
       const { rows } = await query(
-        "SELECT id FROM attendees WHERE org_id = $1 AND identifier = $2 AND deleted_at IS NULL",
-        [org.id, data.identifier]
-      );
+  `SELECT id FROM attendees WHERE org_id = $1 
+   AND (identifier = $2 OR id::text = $2) 
+   AND deleted_at IS NULL`,
+  [org.id, data.identifier]
+);
       if (!rows[0]) return err(res, 404, "Attendee not found");
       attendeeId = rows[0].id;
     }
