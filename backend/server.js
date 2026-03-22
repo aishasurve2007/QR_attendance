@@ -69,12 +69,12 @@ const AttendeeSchema = z.object({
 
 const EventSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  event_time: z.string().optional(),
-  location: z.string().optional(),
-  organizer: z.string().optional(),
-  capacity: z.number().int().positive().optional(),
+  event_time: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  organizer: z.string().nullable().optional(),
+  capacity: z.number().int().positive().nullable().optional(),
 });
 
 const CheckinSchema = z.object({

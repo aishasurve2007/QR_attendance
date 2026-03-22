@@ -407,35 +407,52 @@ async function stopCamera() {
   setCameraActive(false);
 }
 
-  async function handleSave() {
-    if (!form.name || !form.date) return;
-    setSaving(true);
-    setApiError(null);
-    try {
-      if (apiAvailable) {
-        if (editId) {
-          const updated = await apiFetch(`${BASE_URL}/orgs/${orgId}/events/${editId}`, { method: "PUT", body: form });
-          setEvents(ev => ev.map(e => e.id === editId ? { ...e, ...updated } : e));
-        } else {
-          const created = await apiFetch(`${BASE_URL}/orgs/${orgId}/events`, { method: "POST", body: form });
-          setEvents(ev => [...ev, created]);
-        }
+async function handleSave() {
+  if (!form.name || !form.date) return;
+  setSaving(true);
+  setApiError(null);
+  try {
+    const payload = {
+      name: form.name,
+      event_date: form.date,        // ← map date → event_date
+      event_time: form.time || null, // ← map time → event_time
+      location: form.location || null,
+      organizer: form.organizer || null,
+      description: null,
+    };
+
+    console.log("SENDING PAYLOAD:", payload); // ← check this in browser console
+
+    if (apiAvailable) {
+      if (editId) {
+        const updated = await apiFetch(
+          `${BASE_URL}/orgs/${orgId}/events/${editId}`,
+          { method: "PUT", body: payload }
+        );
+        setEvents(ev => ev.map(e => e.id === editId ? { ...e, ...updated } : e));
       } else {
-        if (editId) {
-          setEvents(ev => ev.map(e => e.id === editId ? { ...e, ...form } : e));
-        } else {
-          setEvents(ev => [...ev, { id: "EVT" + uid(), ...form }]);
-        }
+        const created = await apiFetch(
+          `${BASE_URL}/orgs/${orgId}/events`,
+          { method: "POST", body: payload }
+        );
+        setEvents(ev => [...ev, created]);
       }
-      setForm({ name: "", date: "", time: "", location: "", organizer: "" });
-      setEditId(null);
-      setShowCreate(false);
-    } catch (e) {
-      setApiError(e.message);
-    } finally {
-      setSaving(false);
+    } else {
+      if (editId) {
+        setEvents(ev => ev.map(e => e.id === editId ? { ...e, ...form } : e));
+      } else {
+        setEvents(ev => [...ev, { id: "EVT" + uid(), ...form }]);
+      }
     }
+    setForm({ name: "", date: "", time: "", location: "", organizer: "" });
+    setEditId(null);
+    setShowCreate(false);
+  } catch (e) {
+    setApiError(e.message);
+  } finally {
+    setSaving(false);
   }
+}
 
   async function handleDelete(id) {
     try {
