@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 import QRCodeLib from "qrcode";
 import { BrowserQRCodeReader } from "@zxing/browser";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from "recharts";
 
 // ─── Org Config Context ───────────────────────────────────────────────────────
 const OrgContext = createContext({
@@ -806,6 +819,97 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
   );
 }
 
+function AttendanceCharts({ students, events, attendance }) {
+  const attendeeLabel = "Student"; // 🔥 TEMP FIX (avoids useOrgConfig error)
+
+  const eventData = events.map(e => ({
+  id: e.id,
+  name: e.name,
+  displayName: e.name.length > 18 ? e.name.slice(0, 18) + "..." : e.name,
+  checkins: attendance.filter(a => (a.eventId || a.event_id) === e.id).length,
+  capacity: students.length,
+}));
+
+  const groupData = {};
+  attendance.forEach(a => {
+    const student = students.find(s => s.id === (a.studentId || a.attendee_id));
+    const group = student?.dept || student?.group_label || "Unknown";
+    groupData[group] = (groupData[group] || 0) + 1;
+  });
+
+  const pieData = Object.entries(groupData).map(([name, value]) => ({ name, value }));
+
+  const COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ec4899", "#3b82f6", "#8b5cf6"];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+
+      {/* Bar Chart */}
+      <div style={{ background: "#fff", padding: 20 }}>
+        <h4>Check-ins Per Event</h4>
+
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={eventData}  margin={{ bottom: 40 }} >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+  dataKey="name"
+  interval={0}
+  angle={-25}
+  textAnchor="end"
+  height={60}
+  tick={{ fontSize: 11 }}
+/>
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="checkins" fill="#6366f1" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Pie Chart */}
+      <div style={{ background: "#fff", padding: 20 }}>
+        <h4>Attendance by {attendeeLabel}</h4>
+
+        <ResponsiveContainer width="100%" height={220}>
+          <PieChart>
+            <Pie data={pieData} dataKey="value">
+              {pieData.map((_, i) => (
+                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Comparison Chart */}
+      <div style={{ gridColumn: "1 / -1", background: "#fff", padding: 20 }}>
+        <h4>Attendance vs Capacity</h4>
+
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={eventData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+  dataKey="displayName"
+  interval={0}
+  angle={-25}
+  textAnchor="end"
+  height={60}
+  tick={{ fontSize: 11 }}
+/>
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="checkins" fill="#10b981" />
+            <Bar dataKey="capacity" fill="#e0e0e0" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+    </div>
+  );
+}
+
 function ReportsView({ students, events, attendance, loading, orgId, apiAvailable }) {
   const { attendeeLabel, identifierLabel, groupLabel } = useOrgConfig();
   const [selectedEvent, setSelectedEvent] = useState("all");
@@ -815,28 +919,71 @@ function ReportsView({ students, events, attendance, loading, orgId, apiAvailabl
     : attendance.filter(a => (a.eventId || a.event_id) === selectedEvent);
 
   async function exportCSV() {
-    try {
-      if (apiAvailable) {
-        const url = `${BASE_URL}/orgs/${orgId}/reports/export?fmt=csv${selectedEvent !== "all" ? `&eventId=${selectedEvent}` : ""}`;
-        window.open(url, "_blank");
-        return;
-      }
-    } catch {}
-    // fallback
-    const rows = [[attendeeLabel + " Name", identifierLabel, groupLabel, "Event", "Date", "Time"]];
-    filtered.forEach(a => {
-      const s = students.find(x => x.id === (a.studentId || a.attendee_id));
-      const e = events.find(x => x.id === (a.eventId || a.event_id));
-      const ts = a.time || a.checked_in_at;
-      rows.push([s?.name, s?.roll || s?.identifier, s?.dept || s?.group_label, e?.name, formatDate(ts), formatTime(ts)]);
-    });
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = "attendance_report.csv";
-    link.click();
-  }
+  try {
+    if (apiAvailable) {
+      const url = `${BASE_URL}/orgs/${orgId}/reports/export?fmt=csv${selectedEvent !== "all" ? `&eventId=${selectedEvent}` : ""}`;
+      window.open(url, "_blank");
+      return;
+    }
+  } catch {}
+  const rows = [[attendeeLabel + " Name", identifierLabel, groupLabel, "Event", "Date", "Time"]];
+  filtered.forEach(a => {
+    const s = students.find(x => x.id === (a.studentId || a.attendee_id));
+    const e = events.find(x => x.id === (a.eventId || a.event_id));
+    const ts = a.time || a.checked_in_at;
+    rows.push([s?.name, s?.roll || s?.identifier, s?.dept || s?.group_label, e?.name, formatDate(ts), formatTime(ts)]);
+  });
+  const csv = rows.map(r => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = "attendance_report.csv";
+  link.click();
+}
+
+async function exportPDF() {
+  const { jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+  
+  const doc = new jsPDF();
+  
+  // Title
+  doc.setFontSize(20);
+  doc.setTextColor(99, 102, 241);
+  doc.text("AttendIQ Attendance Report", 14, 20);
+  
+  // Subtitle
+  doc.setFontSize(11);
+  doc.setTextColor(100);
+  doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 30);
+  doc.text(`Event: ${selectedEvent === "all" ? "All Events" : events.find(e => e.id === selectedEvent)?.name}`, 14, 37);
+
+  // Summary stats
+  doc.setFontSize(12);
+  doc.setTextColor(0);
+  doc.text(`Total Records: ${filtered.length}`, 14, 50);
+  doc.text(`Unique ${attendeeLabel}s: ${new Set(filtered.map(a => a.studentId || a.attendee_id)).size}`, 80, 50);
+  doc.text(`Events: ${new Set(filtered.map(a => a.eventId || a.event_id)).size}`, 160, 50);
+
+  // Table
+  const tableRows = filtered.map(a => {
+    const s = students.find(x => x.id === (a.studentId || a.attendee_id));
+    const e = events.find(x => x.id === (a.eventId || a.event_id));
+    const ts = a.time || a.checked_in_at;
+    return [s?.name, s?.roll || s?.identifier, s?.dept || s?.group_label, e?.name, formatDate(ts), formatTime(ts)];
+  });
+
+  autoTable(doc, {
+    startY: 58,
+    head: [[attendeeLabel, identifierLabel, groupLabel, "Event", "Date", "Time"]],
+    body: tableRows,
+    headStyles: { fillColor: [99, 102, 241], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [248, 248, 255] },
+    styles: { fontSize: 10, cellPadding: 4 },
+  });
+
+  doc.save("attendance_report.pdf");
+}
 
   return (
     <div>
@@ -855,8 +1002,14 @@ function ReportsView({ students, events, attendance, loading, orgId, apiAvailabl
             {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
           <Btn onClick={exportCSV} variant="success">⬇ Export CSV</Btn>
+<Btn onClick={exportPDF} variant="primary">⬇ Export PDF</Btn>
         </div>
       </div>
+      <AttendanceCharts
+       students={students}
+       events={events}
+       attendance={attendance}
+      />
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 24 }}>
         {loading ? Array(3).fill(0).map((_, i) => <div key={i} style={{ flex: "1 1 160px", background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #f0f0f0" }}><Skeleton height={40} /></div>) : (
