@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 import QRCodeLib from "qrcode";
 import { BrowserQRCodeReader } from "@zxing/browser";
+import LoginPage from "./LoginPage";
 import {
   ResponsiveContainer,
   BarChart,
@@ -1282,7 +1283,9 @@ function SettingsView({ orgId, setOrgConfig, apiAvailable }) {
 export default function AttendanceApp() {
   const ORG_ID = "demo-org";
 
-  // Org config state
+  // ── ALL hooks must come first ──
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("attendiq_token"));
+
   const [orgConfig, setOrgConfigState] = useState({
     orgId: ORG_ID,
     orgName: "AttendIQ College",
@@ -1291,12 +1294,13 @@ export default function AttendanceApp() {
     groupLabel: "Department",
   });
 
-  function setOrgConfig(updates) {
-    setOrgConfigState(prev => ({ ...prev, ...updates }));
-  }
-
-  // API availability detection
   const [apiAvailable, setApiAvailable] = useState(false);
+  const [students, setStudents] = useState(MOCK_STUDENTS);
+  const [events, setEvents] = useState(MOCK_EVENTS);
+  const [attendance, setAttendance] = useState(MOCK_ATTENDANCE);
+  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState("dashboard");
+
   useEffect(() => {
     apiFetch(`${BASE_URL}/orgs/${ORG_ID}`)
       .then(data => {
@@ -1307,13 +1311,6 @@ export default function AttendanceApp() {
       .catch(() => setApiAvailable(false));
   }, []);
 
-  // Data state
-  const [students, setStudents] = useState(MOCK_STUDENTS);
-  const [events, setEvents] = useState(MOCK_EVENTS);
-  const [attendance, setAttendance] = useState(MOCK_ATTENDANCE);
-  const [loading, setLoading] = useState(false);
-
-  // Fetch from API if available
   useEffect(() => {
     if (!apiAvailable) return;
     setLoading(true);
@@ -1325,15 +1322,22 @@ export default function AttendanceApp() {
       setEvents(evts.items || evts);
       const allAttendance = await Promise.all(
         (evts.items || evts).map(e =>
-          apiFetch(`${BASE_URL}/orgs/${ORG_ID}/events/${e.id}/attendance`)
-            .catch(() => [])
+          apiFetch(`${BASE_URL}/orgs/${ORG_ID}/events/${e.id}/attendance`).catch(() => [])
         )
       );
       setAttendance(allAttendance.flat());
     }).catch(() => {}).finally(() => setLoading(false));
   }, [apiAvailable]);
 
-  const [view, setView] = useState("dashboard");
+  // ── NOW the early return, after ALL hooks ──
+  if (!isLoggedIn) {
+    return <LoginPage onLoginSuccess={() => setIsLoggedIn(true)} />;
+  }
+
+  // ── helper function (not a hook, fine anywhere) ──
+  function setOrgConfig(updates) {
+    setOrgConfigState(prev => ({ ...prev, ...updates }));
+  }
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "▦" },
@@ -1344,7 +1348,7 @@ export default function AttendanceApp() {
     { id: "settings", label: "Settings", icon: "⚙️" },
   ];
 
-  return (
+  return  (
     <OrgContext.Provider value={{ ...orgConfig, setOrgConfig }}>
       <div style={{
         fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
@@ -1405,6 +1409,17 @@ export default function AttendanceApp() {
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#333" }}>Admin</div>
                 <div style={{ fontSize: 10, color: "#bbb" }}>admin@college.edu</div>
               </div>
+              <button
+                onClick={() => {
+                 localStorage.removeItem("attendiq_token");
+                 localStorage.removeItem("attendiq_org_id");
+                 setIsLoggedIn(false);
+                }}
+                title="Sign out"
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#bbb" }}
+                >
+               ↩
+             </button>
             </div>
           </div>
         </div>
