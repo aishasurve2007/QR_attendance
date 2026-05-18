@@ -1,5 +1,5 @@
 // App.jsx
-import AttendanceApp from "./attendance.jsx";
+import AttendanceApp from "./AttendanceApp.jsx";
 
 function App() {
   return <AttendanceApp />;
