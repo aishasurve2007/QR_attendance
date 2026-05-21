@@ -37,18 +37,48 @@ function clearAuth() {
   ["attendiq_token","attendiq_org_id","attendiq_role","attendiq_student_id","attendiq_user_name","attendiq_user_id"]
     .forEach(k => localStorage.removeItem(k));
 }
+let loggingOut = false;
+
 async function apiFetch(url, options = {}) {
+  // Check token expiry before every request
   const token = getToken();
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (payload.exp * 1000 < Date.now()) {
+        if (!loggingOut) {
+          loggingOut = true;
+          clearAuth();
+          window.location.reload();
+        }
+        return;
+      }
+    } catch { 
+      clearAuth(); 
+      window.location.reload(); 
+      return; 
+    }
+  }
+
   const res = await fetch(url, {
     ...options,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const json = await res.json();
   if (!res.ok) {
-    if (res.status === 401) { clearAuth(); window.location.reload(); }
+    if (res.status === 401 && !loggingOut) {
+      loggingOut = true;
+      clearAuth();
+      setTimeout(() => { window.location.reload(); }, 100);
+    }
     throw new Error(json.error || "Request failed");
   }
+  loggingOut = false;
   return json.data ?? json;
 }
 
@@ -614,6 +644,15 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
       setForm({ name: "", roll: "", dept: "", email: "" }); setShowAdd(false);
     } catch (e) { setApiError(e.message); } finally { setSaving(false); }
   }
+  async function handleDeleteStudent(id) {
+  if (!window.confirm("Remove this student? This cannot be undone.")) return;
+  try {
+    if (apiAvailable) {
+      await apiFetch(`${BASE_URL}/orgs/${orgId}/attendees/${id}`, { method: "DELETE" });
+    }
+    setStudents(s => s.filter(x => x.id !== id));
+  } catch (e) { alert(e.message); }
+}
 
   async function handleBulkImport() {
     setBulkMsg(null);
@@ -647,7 +686,12 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
                   <td style={{ padding: "14px 18px", fontFamily: "'DM Mono', monospace", color: "#555", fontSize: 12 }}>{s.roll || s.identifier}</td>
                   <td style={{ padding: "14px 18px" }}><Badge color={deptColors[s.dept || s.group_label] || "blue"}>{s.dept || s.group_label}</Badge></td>
                   <td style={{ padding: "14px 18px" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, fontSize: 16, color: "#333" }}>{evtCount}</span><span style={{ fontSize: 11, color: "#aaa" }}>events</span></div></td>
-                  <td style={{ padding: "14px 18px" }}><Btn small variant="ghost" onClick={() => setShowQR(s)}>View QR</Btn></td>
+                  <td style={{ padding: "14px 18px" }}>
+  <div style={{ display: "flex", gap: 8 }}>
+    <Btn small variant="ghost" onClick={() => setShowQR(s)}>View QR</Btn>
+    <Btn small variant="danger" onClick={() => handleDeleteStudent(s.id)}>Remove</Btn>
+  </div>
+</td>
                 </tr>
               );
             })}
@@ -914,7 +958,21 @@ function SettingsView({ orgId, setOrgConfig, apiAvailable }) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function AttendanceApp() {
   const ORG_ID = "demo-org";
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("attendiq_token"));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+  const token = localStorage.getItem("attendiq_token");
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    if (payload.exp * 1000 < Date.now()) {
+      clearAuth();
+      return false;
+    }
+    return true;
+  } catch {
+    clearAuth();
+    return false;
+  }
+});
   const [role, setRole]             = useState(() => localStorage.getItem("attendiq_role") || null);
   const [orgConfig, setOrgConfigState] = useState({ orgId: ORG_ID, orgName: "AttendIQ College", attendeeLabel: "Student", identifierLabel: "Roll No.", groupLabel: "Department" });
   const [apiAvailable, setApiAvailable] = useState(false);

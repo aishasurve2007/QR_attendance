@@ -5,8 +5,35 @@ const BASE_URL = "http://localhost:3001/api/v1";
 
 function getToken() { return localStorage.getItem("attendiq_token"); }
 
+function clearAuth() {
+  ["attendiq_token","attendiq_org_id","attendiq_role","attendiq_student_id","attendiq_user_name","attendiq_user_id"]
+    .forEach(k => localStorage.removeItem(k));
+}
+
+let loggingOut = false;
+
 async function apiFetch(url, options = {}) {
   const token = getToken();
+
+  // Check expiry before hitting the server
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (payload.exp * 1000 < Date.now()) {
+        if (!loggingOut) {
+          loggingOut = true;
+          clearAuth();
+          window.location.reload();
+        }
+        return;
+      }
+    } catch {
+      clearAuth();
+      window.location.reload();
+      return;
+    }
+  }
+
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -17,7 +44,15 @@ async function apiFetch(url, options = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Request failed");
+  if (!res.ok) {
+    if (res.status === 401 && !loggingOut) {
+      loggingOut = true;
+      clearAuth();
+      setTimeout(() => { window.location.reload(); }, 100);
+    }
+    throw new Error(json.error || "Request failed");
+  }
+  loggingOut = false;
   return json.data ?? json;
 }
 
@@ -59,13 +94,12 @@ function Badge({ color = "green", children }) {
   );
 }
 
-// ── Password strength checker ──────────────────────────────────────────────────
 const PW_RULES = [
-  { label: "At least 8 characters",              test: v => v.length >= 8 },
-  { label: "Uppercase letter (A-Z)",             test: v => /[A-Z]/.test(v) },
-  { label: "Lowercase letter (a-z)",             test: v => /[a-z]/.test(v) },
-  { label: "Number (0-9)",                        test: v => /\d/.test(v) },
-  { label: "Symbol (!@#$%^&*…)",                 test: v => /[\W_]/.test(v) },
+  { label: "At least 8 characters",  test: v => v.length >= 8 },
+  { label: "Uppercase letter (A-Z)", test: v => /[A-Z]/.test(v) },
+  { label: "Lowercase letter (a-z)", test: v => /[a-z]/.test(v) },
+  { label: "Number (0-9)",           test: v => /\d/.test(v) },
+  { label: "Symbol (!@#$%^&*…)",    test: v => /[\W_]/.test(v) },
 ];
 
 function PasswordStrength({ value }) {
@@ -89,7 +123,10 @@ function PasswordStrength({ value }) {
       </div>
       <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
         {PW_RULES.map(r => (
-          <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: r.test(value) ? "#166534" : "#aaa" }}>
+          <div key={r.label} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            fontSize: 11, color: r.test(value) ? "#166534" : "#aaa",
+          }}>
             <span>{r.test(value) ? "✓" : "○"}</span>
             <span>{r.label}</span>
           </div>
@@ -99,6 +136,51 @@ function PasswordStrength({ value }) {
   );
 }
 
+// ── PwInput is OUTSIDE StudentDashboard — this is the fix ──────────────────
+function PwInput({ label, field, value, showPw, onChange, onToggleShow, onKeyDown }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{
+        display: "block", fontSize: 11, fontWeight: 700, color: "#555",
+        marginBottom: 5, letterSpacing: "0.05em", textTransform: "uppercase",
+      }}>
+        {label}
+      </label>
+      <div style={{ position: "relative" }}>
+        <input
+          type={showPw ? "text" : "password"}
+          value={value}
+          placeholder={label}
+          onChange={e => onChange(field, e.target.value)}
+          onKeyDown={onKeyDown}
+          onFocus={e => (e.target.style.borderColor = "#6366f1")}
+          onBlur={e  => (e.target.style.borderColor = "#e8e8e8")}
+          style={{
+            width: "100%", padding: "10px 42px 10px 14px",
+            borderRadius: 10, border: "1.5px solid #e8e8e8",
+            fontSize: 14, fontFamily: "inherit",
+            outline: "none", boxSizing: "border-box",
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => onToggleShow(field)}
+          style={{
+            position: "absolute", right: 12, top: "50%",
+            transform: "translateY(-50%)", background: "none",
+            border: "none", cursor: "pointer", fontSize: 15,
+            color: "#bbb", padding: 0,
+          }}
+          aria-label={showPw ? "Hide password" : "Show password"}
+        >
+          {showPw ? "🙈" : "👁"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── StudentDashboard starts here ───────────────────────────────────────────
 export default function StudentDashboard({ onLogout }) {
   const studentId   = localStorage.getItem("attendiq_student_id");
   const studentName = localStorage.getItem("attendiq_user_name") || "Student";
@@ -110,7 +192,6 @@ export default function StudentDashboard({ onLogout }) {
   const [loading,    setLoading]    = useState(true);
   const [activeTab,  setActiveTab]  = useState("home");
 
-  // ── Change Password state ──────────────────────────────────────────────────
   const [pwForm,    setPwForm]    = useState({ current: "", next: "", confirm: "" });
   const [pwError,   setPwError]   = useState(null);
   const [pwSuccess, setPwSuccess] = useState(false);
@@ -131,26 +212,24 @@ export default function StudentDashboard({ onLogout }) {
     }).catch(console.error).finally(() => setLoading(false));
   }, [studentId]);
 
-  // ── Change password handler ────────────────────────────────────────────────
   async function handleChangePassword() {
-    setPwError(null); setPwSuccess(false);
+    setPwError(null);
+    setPwSuccess(false);
     const { current, next, confirm } = pwForm;
-
     if (!current || !next || !confirm)
       return setPwError("All three fields are required.");
+    if (next === current)
+      return setPwError("New password must differ from your current password.");
     if (next !== confirm)
       return setPwError("New password and confirmation don't match.");
-
-    const allPassed = PW_RULES.every(r => r.test(next));
-    if (!allPassed)
+    if (!PW_RULES.every(r => r.test(next)))
       return setPwError("New password doesn't meet all requirements below.");
-
     setPwSaving(true);
     try {
-      await apiFetch(`${BASE_URL}/student/change-password`, {
-        method: "PUT",
-        body: { currentPassword: current, newPassword: next },
-      });
+      await apiFetch(`${BASE_URL}/orgs/${orgId}/attendees/${studentId}/change-password`, {
+  method: "PUT",
+  body: { currentPassword: current, newPassword: next },
+});
       setPwSuccess(true);
       setPwForm({ current: "", next: "", confirm: "" });
     } catch (e) {
@@ -160,10 +239,21 @@ export default function StudentDashboard({ onLogout }) {
     }
   }
 
+  function handlePwChange(field, value) {
+    setPwForm(f => ({ ...f, [field]: value }));
+  }
+
+  function handleToggleShow(field) {
+    setShowPw(p => ({ ...p, [field]: !p[field] }));
+  }
+
+  function handlePwKeyDown(e) {
+    if (e.key === "Enter") handleChangePassword();
+  }
+
   const attendedEventIds = new Set(attended.map(a => a.event_id));
   const initial = studentName[0]?.toUpperCase() || "S";
   const hue = studentName.charCodeAt(0) * 5;
-
   const EVENT_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ec4899", "#3b82f6", "#8b5cf6"];
 
   const s = {
@@ -202,35 +292,7 @@ export default function StudentDashboard({ onLogout }) {
       padding: "6px 14px", fontSize: 12, fontWeight: 600,
       color: "#888", cursor: "pointer", fontFamily: "inherit",
     },
-    pwInput: {
-      width: "100%", padding: "10px 42px 10px 14px", borderRadius: 10,
-      border: "1.5px solid #e8e8e8", fontSize: 14,
-      fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-    },
   };
-
-  function PwInput({ label, field, placeholder }) {
-    return (
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#555", marginBottom: 5, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</label>
-        <div style={{ position: "relative" }}>
-          <input
-            type={showPw[field] ? "text" : "password"}
-            value={pwForm[field]}
-            placeholder={placeholder}
-            onChange={e => setPwForm(f => ({ ...f, [field]: e.target.value }))}
-            onFocus={e => e.target.style.borderColor = "#6366f1"}
-            onBlur={e => e.target.style.borderColor = "#e8e8e8"}
-            style={s.pwInput}
-          />
-          <button
-            onClick={() => setShowPw(p => ({ ...p, [field]: !p[field] }))}
-            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "#bbb", padding: 0 }}
-          >{showPw[field] ? "🙈" : "👁"}</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={s.page}>
@@ -239,7 +301,6 @@ export default function StudentDashboard({ onLogout }) {
         * { box-sizing: border-box; }
       `}</style>
 
-      {/* Header */}
       <div style={s.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📋</div>
@@ -253,7 +314,6 @@ export default function StudentDashboard({ onLogout }) {
       </div>
 
       <div style={s.content}>
-        {/* Tabs — now includes Security */}
         <div style={s.tabs}>
           <button style={s.tab(activeTab === "home")}     onClick={() => setActiveTab("home")}>🏠 Home</button>
           <button style={s.tab(activeTab === "events")}   onClick={() => setActiveTab("events")}>📅 All Events</button>
@@ -274,7 +334,6 @@ export default function StudentDashboard({ onLogout }) {
               <div style={{ fontSize: 12, color: "#bbb", marginBottom: 16 }}>{profile?.email}</div>
               <Badge color="blue">🎓 Student</Badge>
             </div>
-
             <div style={s.statRow}>
               <div style={s.stat}>
                 <div style={{ fontSize: 28, fontWeight: 800, color: "#111", fontFamily: "'Playfair Display', serif" }}>{attended.length}</div>
@@ -291,7 +350,6 @@ export default function StudentDashboard({ onLogout }) {
                 <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>Attendance Rate</div>
               </div>
             </div>
-
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setActiveTab("events")} style={{ flex: 1, padding: 13, background: "#f0f0ff", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#6366f1", cursor: "pointer", fontFamily: "inherit" }}>📅 Browse All Events</button>
               <button onClick={() => setActiveTab("qr")} style={{ flex: 1, padding: 13, background: "#f0f0ff", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#6366f1", cursor: "pointer", fontFamily: "inherit" }}>🔲 Show My QR Code</button>
@@ -306,7 +364,6 @@ export default function StudentDashboard({ onLogout }) {
               <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, fontFamily: "'Playfair Display', serif", color: "#111" }}>All Events</h2>
               <p style={{ margin: 0, fontSize: 13, color: "#888" }}>{allEvents.length} events · You've attended {attended.length}</p>
             </div>
-
             {allEvents.length === 0 ? (
               <div style={{ ...s.card, textAlign: "center", color: "#ccc", padding: 60 }}>No events yet</div>
             ) : (
@@ -395,60 +452,46 @@ export default function StudentDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* ── SECURITY / CHANGE PASSWORD ── */}
+        {/* ── SECURITY ── */}
         {!loading && activeTab === "security" && (
           <div>
             <div style={{ marginBottom: 20 }}>
               <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, fontFamily: "'Playfair Display', serif", color: "#111" }}>Security</h2>
               <p style={{ margin: 0, fontSize: 13, color: "#888" }}>Update your password to keep your account safe</p>
             </div>
-
             <div style={{ ...s.card, maxWidth: 460 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "'Playfair Display', serif", marginBottom: 20, color: "#111" }}>🔐 Change Password</div>
-
-              {/* Error banner */}
+              <div style={{ fontSize: 15, fontWeight: 800, fontFamily: "'Playfair Display', serif", marginBottom: 20, color: "#111" }}>
+                🔐 Change Password
+              </div>
               {pwError && (
                 <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, marginBottom: 16 }}>
                   ⚠️ {pwError}
                 </div>
               )}
-
-              {/* Success banner */}
               {pwSuccess && (
                 <div style={{ background: "#dcfce7", color: "#166534", borderRadius: 9, padding: "10px 14px", fontSize: 13, fontWeight: 600, marginBottom: 16 }}>
                   ✅ Password changed successfully!
                 </div>
               )}
-
-              <PwInput label="Current Password"      field="current" placeholder="Your current password" />
-              <PwInput label="New Password"           field="next"    placeholder="Choose a strong new password" />
-
-              {/* Live strength meter shown while typing new password */}
+              <PwInput label="Current Password"     field="current" value={pwForm.current} showPw={showPw.current} onChange={handlePwChange} onToggleShow={handleToggleShow} onKeyDown={handlePwKeyDown} />
+              <PwInput label="New Password"          field="next"    value={pwForm.next}    showPw={showPw.next}    onChange={handlePwChange} onToggleShow={handleToggleShow} onKeyDown={handlePwKeyDown} />
               <PasswordStrength value={pwForm.next} />
-
-              <PwInput label="Confirm New Password"   field="confirm" placeholder="Repeat your new password" />
-
-              {/* Match indicator */}
+              <PwInput label="Confirm New Password"  field="confirm" value={pwForm.confirm} showPw={showPw.confirm} onChange={handlePwChange} onToggleShow={handleToggleShow} onKeyDown={handlePwKeyDown} />
               {pwForm.next && pwForm.confirm && (
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 14, color: pwForm.next === pwForm.confirm ? "#166534" : "#991b1b" }}>
                   {pwForm.next === pwForm.confirm ? "✓ Passwords match" : "✗ Passwords don't match"}
                 </div>
               )}
-
-              <button
-                onClick={handleChangePassword}
-                disabled={pwSaving}
-                style={{ width: "100%", padding: "11px 0", background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: pwSaving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: pwSaving ? 0.7 : 1 }}
-              >
+              <button onClick={handleChangePassword} disabled={pwSaving} style={{ width: "100%", padding: "11px 0", background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: pwSaving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: pwSaving ? 0.7 : 1 }}>
                 {pwSaving ? "Updating…" : "Update Password"}
               </button>
-
               <div style={{ marginTop: 16, padding: "12px 14px", background: "#f8f7ff", borderRadius: 9, fontSize: 12, color: "#6366f1" }}>
                 💡 Use a mix of uppercase, lowercase, numbers and symbols for a strong password.
               </div>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

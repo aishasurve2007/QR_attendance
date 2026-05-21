@@ -82,7 +82,7 @@ app.post("/auth/login", async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, orgId: user.org_id, role: user.role, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7h" }
     );
     ok(res, { token, orgId: user.org_id, role: user.role, email: user.email, name: user.email.split("@")[0] });
   } catch (e) { err(res, 500, e.message); }
@@ -109,7 +109,7 @@ app.post("/auth/student-login", async (req, res) => {
     const token = jwt.sign(
       { userId: student.id, orgId: org.id, role: "student", identifier: student.identifier, name: student.name },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7h" }
     );
     ok(res, { token, orgId: org.id, role: "student", studentId: student.id, name: student.name });
   } catch (e) { err(res, 500, e.message); }
@@ -243,6 +243,25 @@ app.post("/auth/bulk-set-passwords", async (req, res) => {
       count++;
     }
     ok(res, { updated: count, message: `Set default password for ${count} students` });
+  } catch (e) { err(res, 500, e.message); }
+});
+
+app.put("/admin/change-password", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return err(res, 400, "Both fields required");
+
+    const { rows } = await query(
+      "SELECT * FROM admin_users WHERE id = $1", [req.user.userId]
+    );
+    if (!rows[0]) return err(res, 404, "User not found");
+    if (!bcrypt.compareSync(currentPassword, rows[0].password_hash))
+      return err(res, 401, "Current password is incorrect");
+
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await query("UPDATE admin_users SET password_hash = $1 WHERE id = $2", [hash, req.user.userId]);
+    ok(res, { message: "Password updated successfully" });
   } catch (e) { err(res, 500, e.message); }
 });
 
@@ -383,37 +402,41 @@ api.delete("/orgs/:orgId/attendees/:id", async (req, res) => {
 
 // ── Events ─────────────────────────────────────────────────────────────────────
 // GET all events (admin + students see all; organizer sees only their own)
-api.get("/orgs/:orgId/events", async (req, res) => {
+api.get("/orgs/:orgId/events", requireAuth, async (req, res) => {
   try {
     const org = await resolveOrg(req.params.orgId);
-    let sql = `SELECT e.*, u.email AS organizer_email,
-               (SELECT COUNT(*) FROM attendance a WHERE a.event_id = e.id) AS attendance_count
-               FROM events e
-               LEFT JOIN admin_users u ON u.id = e.created_by
-               WHERE e.org_id = $1`;
     const params = [org.id];
-
-    // Scope to organizer's own events if role = organizer
-    if (req.query.created_by) {
+ 
+    let sql = `
+      SELECT e.*,
+             u.email AS organizer_email,
+             (SELECT COUNT(*) FROM attendance a WHERE a.event_id = e.id) AS attendance_count
+      FROM events e
+      LEFT JOIN admin_users u ON u.id = e.created_by
+      WHERE e.org_id = $1
+    `;
+ 
+    // Organizers only see their own events — enforced server-side from JWT
+    if (req.user.role === "organizer") {
       sql += ` AND e.created_by = $2`;
-      params.push(req.query.created_by);
+      params.push(req.user.userId);
     }
+ 
     if (req.query.upcoming === "true") sql += " AND e.event_date >= CURRENT_DATE";
-    if (req.query.past === "true") sql += " AND e.event_date < CURRENT_DATE";
+    if (req.query.past    === "true") sql += " AND e.event_date < CURRENT_DATE";
+ 
     sql += " ORDER BY e.event_date DESC";
-
+ 
     const { rows } = await query(sql, params);
     ok(res, rows);
   } catch (e) { err(res, 500, e.message); }
 });
 
-// POST create event — records created_by from JWT
-api.post("/orgs/:orgId/events", async (req, res) => {
+api.post("/orgs/:orgId/events", requireAuth, async (req, res) => {
   try {
     const data = EventSchema.parse(req.body);
     const org = await resolveOrg(req.params.orgId);
-    // created_by comes from the Authorization header (JWT)
-    const createdBy = req.body._created_by || null; // frontend sends this
+    const createdBy = req.user.userId; // always read from JWT, never from body
     const { rows } = await query(
       `INSERT INTO events (org_id, name, description, event_date, event_time, location, organizer, capacity, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
@@ -520,6 +543,38 @@ api.get("/orgs/:orgId/attendees/:id/my-attendance", async (req, res) => {
       [req.params.id]
     );
     ok(res, rows);
+  } catch (e) { err(res, 500, e.message); }
+});
+
+api.put("/orgs/:orgId/attendees/:id/change-password", requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+ 
+    if (!currentPassword || !newPassword)
+      return err(res, 400, "Current and new password are required");
+ 
+    // Make sure the logged-in student can only change their own password
+    if (req.user.userId !== req.params.id)
+      return err(res, 403, "Forbidden");
+ 
+    const org = await resolveOrg(req.params.orgId);
+ 
+    const { rows } = await query(
+      "SELECT * FROM attendees WHERE id = $1 AND org_id = $2 AND deleted_at IS NULL",
+      [req.params.id, org.id]
+    );
+    if (!rows[0]) return err(res, 404, "Student not found");
+ 
+    if (!bcrypt.compareSync(currentPassword, rows[0].password_hash))
+      return err(res, 401, "Current password is incorrect");
+ 
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    await query(
+      "UPDATE attendees SET password_hash = $1 WHERE id = $2",
+      [newHash, req.params.id]
+    );
+ 
+    ok(res, { message: "Password updated successfully" });
   } catch (e) { err(res, 500, e.message); }
 });
 
