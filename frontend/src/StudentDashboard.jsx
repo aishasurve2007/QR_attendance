@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import QRCodeLib from "qrcode";
 
-const BASE_URL = "http://localhost:3001/api/v1";
+const BASE_URL = "https://attendiq-api.onrender.com/api/v1";
 
 function getToken() { return localStorage.getItem("attendiq_token"); }
 

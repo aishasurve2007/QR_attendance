@@ -27,8 +27,8 @@ const OrgContext = createContext({
 function useOrgConfig() { return useContext(OrgContext); }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
-const BASE_URL = "http://localhost:3001/api/v1";
-const ADMIN_URL = "http://localhost:3001/admin";
+const BASE_URL = "https://attendiq-api.onrender.com/api/v1";
+const ADMIN_URL = "https://attendiq-api.onrender.com/admin";
 
 function getToken() {
   return typeof localStorage !== "undefined" ? localStorage.getItem("attendiq_token") : null;

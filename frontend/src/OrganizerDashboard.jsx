@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const BASE_URL = "http://localhost:3001/api/v1";
+const BASE_URL = "https://attendiq-api.onrender.com/api/v1";
 const ORG_ID = "demo-org";
 
 function getToken()  { return localStorage.getItem("attendiq_token"); }
@@ -297,7 +297,7 @@ export default function OrganizerDashboard({ onLogout }) {
     if (!PW_RULES.every(r => r.test(next))) return setPwError("New password doesn't meet all complexity requirements.");
     setPwSaving(true);
     try {
-      await apiFetch(`http://localhost:3001/admin/change-password`, {
+      await apiFetch(`https://attendiq-api.onrender.com/admin/change-password`, {
         method: "PUT",
         body: { currentPassword: current, newPassword: next },
       });
