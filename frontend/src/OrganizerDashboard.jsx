@@ -220,20 +220,34 @@ export default function OrganizerDashboard({ onLogout }) {
   }
 
   // ── QR Scanner ─────────────────────────────────────────────────────────────
-  async function startCamera() {
+ async function startCamera() {
+  try {
+    setCameraActive(true); setScanMsg(null);
+    const { Html5Qrcode } = await import("html5-qrcode");
+    const scanner = new Html5Qrcode("org-qr-reader");
+    scannerRef.current = scanner;
+
+    // Try back camera first, fall back to front camera for desktop
     try {
-      setCameraActive(true); setScanMsg(null);
-      const { Html5Qrcode } = await import("html5-qrcode");
-      const scanner = new Html5Qrcode("org-qr-reader");
-      scannerRef.current = scanner;
       await scanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (text) => { setScanInput(text); setScanMsg({ type: "success", text: "✓ QR Scanned!" }); stopCamera(); },
         () => {}
       );
-    } catch (e) { setScanMsg({ type: "error", text: "Camera error: " + e.message }); setCameraActive(false); }
+    } catch {
+      await scanner.start(
+        { facingMode: "user" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (text) => { setScanInput(text); setScanMsg({ type: "success", text: "✓ QR Scanned!" }); stopCamera(); },
+        () => {}
+      );
+    }
+  } catch (e) {
+    setScanMsg({ type: "error", text: `Camera error: ${e?.message || "Permission denied"}` });
+    setCameraActive(false);
   }
+}
 
   async function stopCamera() {
     try { if (scannerRef.current) { await scannerRef.current.stop(); scannerRef.current = null; } } catch {}
