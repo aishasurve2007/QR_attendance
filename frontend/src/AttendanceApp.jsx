@@ -518,7 +518,7 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
   try {
     setCameraActive(true); setScanMsg(null);
     const { Html5Qrcode } = await import("html5-qrcode");
-    const scanner = new Html5Qrcode("org-qr-reader");
+    const scanner = new Html5Qrcode("qr-reader");
     scannerRef.current = scanner;
 
     try {
@@ -540,6 +540,15 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
     setScanMsg({ type: "error", text: `Camera error: ${e?.message || "Permission denied"}` });
     setCameraActive(false);
   }
+}
+async function stopCamera() {
+  try { 
+    if (scannerRef.current) { 
+      await scannerRef.current.stop(); 
+      scannerRef.current = null; 
+    } 
+  } catch {}
+  setCameraActive(false);
 }
   async function handleSave() {
     if (!form.name || !form.date) return;

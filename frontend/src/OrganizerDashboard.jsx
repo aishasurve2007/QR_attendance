@@ -224,7 +224,7 @@ export default function OrganizerDashboard({ onLogout }) {
   try {
     setCameraActive(true); setScanMsg(null);
     const { Html5Qrcode } = await import("html5-qrcode");
-    const scanner = new Html5Qrcode("org-qr-reader");
+    const scanner = new Html5Qrcode("qr-reader");
     scannerRef.current = scanner;
 
     try {
