@@ -7,7 +7,7 @@
 //   3. OrganizersView: "Reset PW" now opens a 3-field modal (old password
 //      is not required for admin reset, but complexity IS enforced)
 // ─────────────────────────────────────────────────────────────────────────────
-
+import { Html5Qrcode } from "html5-qrcode";
 import { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 import QRCodeLib from "qrcode";
 import LoginPage from "./LoginPage";
@@ -517,7 +517,7 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
   async function startCamera() {
     try {
       setCameraActive(true); setScanMsg(null);
-      const { Html5Qrcode } = await import("html5-qrcode");
+       
       const scanner = new Html5Qrcode("qr-reader");
       scannerRef.current = scanner;
       await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } },

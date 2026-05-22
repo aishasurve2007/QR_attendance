@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-
+import { Html5Qrcode } from "html5-qrcode";
 const BASE_URL = "https://attendiq-api.onrender.com/api/v1";
 const ORG_ID = "demo-org";
 
@@ -223,11 +223,9 @@ export default function OrganizerDashboard({ onLogout }) {
  async function startCamera() {
   try {
     setCameraActive(true); setScanMsg(null);
-    const { Html5Qrcode } = await import("html5-qrcode");
     const scanner = new Html5Qrcode("org-qr-reader");
     scannerRef.current = scanner;
 
-    // Try back camera first, fall back to front camera for desktop
     try {
       await scanner.start(
         { facingMode: "environment" },
