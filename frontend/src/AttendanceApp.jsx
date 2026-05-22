@@ -997,8 +997,16 @@ export default function AttendanceApp() {
   }, [apiAvailable, role]);
 
   function setOrgConfig(updates) { setOrgConfigState(prev => ({ ...prev, ...updates })); }
-  function handleLogout() { clearAuth(); setIsLoggedIn(false); setRole(null); }
-  function handleLoginSuccess({ role: r }) { setRole(r); setIsLoggedIn(true); }
+  function handleLogout() {
+  clearAuth();
+  setIsLoggedIn(false);
+  setRole(null);
+  window.location.href = "/";
+}
+  function handleLoginSuccess({ role: r }) {
+  setRole(r);
+  setIsLoggedIn(true);
+}
 
   if (!isLoggedIn)          return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   if (role === "student")   return <StudentDashboard onLogout={handleLogout} />;
@@ -1013,6 +1021,9 @@ export default function AttendanceApp() {
     { id: "organizers", label: "Organizers",                        icon: "🏛" },
     { id: "settings",   label: "Settings",                          icon: "⚙️" },
   ];
+  if (!isLoggedIn) return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  if (role === "student") return <StudentDashboard onLogout={handleLogout} />;
+  if (role === "organizer") return <OrganizerDashboard onLogout={handleLogout} />;
 
   return (
     <OrgContext.Provider value={{ ...orgConfig, setOrgConfig }}>
