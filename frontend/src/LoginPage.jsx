@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const BASE_URL = "http://localhost:3001";
+const BASE_URL = "https://attendiq-api.onrender.com";
 
 export default function LoginPage({ onLoginSuccess }) {
   const [tab, setTab] = useState("admin"); // "admin" | "student"
