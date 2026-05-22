@@ -515,19 +515,31 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
   const [cameraActive, setCameraActive] = useState(false);
 
   async function startCamera() {
+  try {
+    setCameraActive(true); setScanMsg(null);
+    const scanner = new Html5Qrcode("org-qr-reader");
+    scannerRef.current = scanner;
+
     try {
-      setCameraActive(true); setScanMsg(null);
-       
-      const scanner = new Html5Qrcode("qr-reader");
-      scannerRef.current = scanner;
-      await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => { setScanInput(decodedText); setScanMsg({ type: "success", text: "✓ QR Scanned!" }); stopCamera(); }, () => {});
-    } catch (e) { setScanMsg({ type: "error", text: "Camera error: " + e.message }); setCameraActive(false); }
-  }
-  async function stopCamera() {
-    try { if (scannerRef.current) { await scannerRef.current.stop(); scannerRef.current = null; } } catch {}
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (text) => { setScanInput(text); setScanMsg({ type: "success", text: "✓ QR Scanned!" }); stopCamera(); },
+        () => {}
+      );
+    } catch {
+      await scanner.start(
+        { facingMode: "user" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (text) => { setScanInput(text); setScanMsg({ type: "success", text: "✓ QR Scanned!" }); stopCamera(); },
+        () => {}
+      );
+    }
+  } catch (e) {
+    setScanMsg({ type: "error", text: `Camera error: ${e?.message || "Permission denied"}` });
     setCameraActive(false);
   }
+}
   async function handleSave() {
     if (!form.name || !form.date) return;
     setSaving(true); setApiError(null);
