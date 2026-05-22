@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+
 const BASE_URL = "https://attendiq-api.onrender.com/api/v1";
 const ORG_ID = "demo-org";
 
@@ -223,6 +223,7 @@ export default function OrganizerDashboard({ onLogout }) {
  async function startCamera() {
   try {
     setCameraActive(true); setScanMsg(null);
+    const { Html5Qrcode } = await import("html5-qrcode");
     const scanner = new Html5Qrcode("org-qr-reader");
     scannerRef.current = scanner;
 
@@ -246,6 +247,7 @@ export default function OrganizerDashboard({ onLogout }) {
     setCameraActive(false);
   }
 }
+
 
   async function stopCamera() {
     try { if (scannerRef.current) { await scannerRef.current.stop(); scannerRef.current = null; } } catch {}
