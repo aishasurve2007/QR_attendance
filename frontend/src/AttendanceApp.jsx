@@ -7,7 +7,6 @@
 //   3. OrganizersView: "Reset PW" now opens a 3-field modal (old password
 //      is not required for admin reset, but complexity IS enforced)
 // ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 import QRCodeLib from "qrcode";
 import LoginPage from "./LoginPage";
@@ -627,6 +626,8 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
 function StudentsView({ students, setStudents, attendance, events, loading, apiAvailable, orgId }) {
   const { attendeeLabel, identifierLabel, groupLabel } = useOrgConfig();
   const [showAdd, setShowAdd] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
   const [showQR, setShowQR] = useState(null);
   const [showBulk, setShowBulk] = useState(false);
   const [bulkCsv, setBulkCsv] = useState("");
@@ -666,7 +667,18 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
   }
 
   const deptColors = { "Computer Science": "blue", "Electrical Engineering": "amber", "Mechanical Engineering": "teal", "Biotechnology": "green" };
+  const filteredStudents = students.filter(student => {
+    const rollNum = student.roll || student.identifier || "";
+    const name = student.name || "";
+    const dept = student.dept || student.group_label || "";
 
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          rollNum.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesDept = deptFilter === "all" || dept === deptFilter;
+
+    return matchesSearch && matchesDept;
+  });
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
@@ -674,11 +686,31 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
         <div style={{ display: "flex", gap: 10 }}><Btn variant="secondary" onClick={() => setShowBulk(true)}>⬆ Import CSV</Btn><Btn onClick={() => setShowAdd(true)}>＋ Add {attendeeLabel}</Btn></div>
       </div>
       <ErrorBanner message={apiError} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, maxWidth: 520 }}>
+        <input 
+          type="text" 
+          placeholder={`Search by name or ${identifierLabel}...`}
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 13, outline: "none" }}
+        />
+        <select
+          value={deptFilter}
+          onChange={e => setDeptFilter(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 13, backgroundColor: "#fff", outline: "none", cursor: "pointer" }}
+        >
+          <option value="all">All {groupLabel}s</option>
+          {/* Extract unique departments dynamically from your students array */}
+          {[...new Set(students.map(s => s.dept || s.group_label).filter(Boolean))].map(d => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+      </div>
       <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0f0f0", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#fafafa", borderBottom: "2px solid #f0f0f0" }}>{[attendeeLabel, identifierLabel, groupLabel, "Events Attended", "QR Code"].map(h => <th key={h} style={{ textAlign: "left", padding: "14px 18px", color: "#aaa", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>)}</tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={5}><TableSkeleton rows={5} cols={5} /></td></tr> : students.map(s => {
+            {loading ? <tr><td colSpan={5}><TableSkeleton rows={5} cols={5} /></td></tr> : filteredStudents.map(s => {
               const evtCount = attendance.filter(a => (a.studentId || a.attendee_id) === s.id).length;
               return (
                 <tr key={s.id} style={{ borderBottom: "1px solid #f8f8f8" }} onMouseEnter={e => e.currentTarget.style.background = "#fafafa"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
@@ -793,19 +825,81 @@ function ReportsView({ students, events, attendance, loading, orgId, apiAvailabl
 }
 
 function StudentPortal({ students, attendance, events, loading }) {
-  const { attendeeLabel } = useOrgConfig();
+  const { attendeeLabel, groupLabel } = useOrgConfig();
   const [selectedId, setSelectedId] = useState(students[0]?.id || "");
+  
+  // 🆕 Search and Filter States
+  const [portalSearch, setPortalSearch] = useState("");
+  const [portalGroupFilter, setPortalGroupFilter] = useState("all");
+
+  // 🆕 Filter the students array directly for the dropdown options
+  const filteredDropdownStudents = (students || []).filter(student => {
+    const name = student.name || "";
+    const identifier = student.identifier || student.roll || "";
+    const group = student.group_label || student.dept || "";
+
+    const matchesSearch = name.toLowerCase().includes(portalSearch.toLowerCase()) || 
+                          identifier.toLowerCase().includes(portalSearch.toLowerCase());
+    
+    const matchesGroup = portalGroupFilter === "all" || group === portalGroupFilter;
+
+    return matchesSearch && matchesGroup;
+  });
+
   const student = students.find(s => s.id === selectedId);
   const myAtt = attendance.filter(a => (a.studentId || a.attendee_id) === selectedId);
-  useEffect(() => { if (!selectedId && students.length > 0) setSelectedId(students[0].id); }, [students]);
+
+  // Auto-select the first student from the filtered list if the current one gets filtered out
+  useEffect(() => { 
+    if (filteredDropdownStudents.length > 0 && !filteredDropdownStudents.some(s => s.id === selectedId)) {
+      setSelectedId(filteredDropdownStudents[0].id);
+    } 
+  }, [portalSearch, portalGroupFilter, students]);
+
   return (
     <div>
-      <div style={{ marginBottom: 24 }}><h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display', serif" }}>{attendeeLabel} Portal</h2><p style={{ color: "#888", margin: "6px 0 0", fontSize: 14 }}>View attendance history and QR code</p></div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display', serif" }}>{attendeeLabel} Portal</h2>
+        <p style={{ color: "#888", margin: "6px 0 0", fontSize: 14 }}>View attendance history and QR code</p>
+      </div>
+
+      {/* 🆕 CONTROL BAR PLACEHERE: Search and Group Filter Input Elements */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "16px", maxWidth: "500px" }}>
+        <input 
+          type="text" 
+          placeholder={`Search by name or ${attendeeLabel} ID...`}
+          value={portalSearch}
+          onChange={e => setPortalSearch(e.target.value)}
+          style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 13, outline: "none" }}
+        />
+        <select
+          value={portalGroupFilter}
+          onChange={e => setPortalGroupFilter(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 13, backgroundColor: "#fff", outline: "none", cursor: "pointer" }}
+        >
+          <option value="all">All {groupLabel}s</option>
+          {[...new Set((students || []).map(s => s.group_label || s.dept).filter(Boolean))].map(g => (
+            <option key={g} value={g}>{g}</option>
+          ))}
+        </select>
+      </div>
+      
       <div style={{ marginBottom: 24 }}>
         <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 8, letterSpacing: "0.05em", textTransform: "uppercase" }}>Select {attendeeLabel}</label>
-        <select value={selectedId} onChange={e => setSelectedId(e.target.value)} style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 14, fontFamily: "inherit", outline: "none", minWidth: 280 }}>{students.map(s => <option key={s.id} value={s.id}>{s.name} — {s.roll || s.identifier}</option>)}</select>
+        <select value={selectedId} onChange={e => setSelectedId(e.target.value)} style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 14, fontFamily: "inherit", outline: "none", minWidth: 280 }}>
+          {/* 🔄 CHANGED: Now rendering filtered options instead of the full array */}
+          {filteredDropdownStudents.length === 0 ? (
+            <option value="">No matching profiles found</option>
+          ) : (
+            filteredDropdownStudents.map(s => (
+              <option key={s.id} value={s.id}>{s.name} — {s.roll || s.identifier}</option>
+            ))
+          )}
+        </select>
       </div>
+
       {loading && <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}><Skeleton height={400} radius={20} /><Skeleton height={400} radius={20} /></div>}
+      
       {!loading && student && (
         <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}>
           <div style={{ background: "#fff", borderRadius: 20, padding: 28, border: "1px solid #f0f0f0", boxShadow: "0 1px 3px rgba(0,0,0,0.07)", textAlign: "center" }}>
@@ -817,6 +911,7 @@ function StudentPortal({ students, attendance, events, loading }) {
             <p style={{ color: "#bbb", fontSize: 11, fontFamily: "'DM Mono', monospace", margin: 0 }}>{student.id}</p>
             <div style={{ marginTop: 16 }}><StatCard icon="✅" label="Events Attended" value={myAtt.length} accent="#6366f1" /></div>
           </div>
+
           <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f0f0f0", boxShadow: "0 1px 3px rgba(0,0,0,0.07)", overflow: "hidden" }}>
             <div style={{ padding: "22px 24px", borderBottom: "1px solid #f5f5f5" }}><h4 style={{ margin: 0, fontFamily: "'Playfair Display', serif", fontSize: 17 }}>Attendance History</h4></div>
             {myAtt.length === 0 ? <div style={{ padding: 40, textAlign: "center", color: "#ccc" }}>No events attended yet</div> : myAtt.map(a => {

@@ -299,22 +299,67 @@ api.patch("/orgs/:orgId", async (req, res) => {
 });
 
 // ── Attendees ─────────────────────────────────────────────────────────────────
+// ── Attendees with Server-Side Search, Filter, and Pagination ────────────────
+// ── Attendees with Optional Unpaginated Fetch for Dropdowns ────────────────
 api.get("/orgs/:orgId/attendees", async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = (page - 1) * limit;
     const org = await resolveOrg(req.params.orgId);
-    const { rows } = await query(
-      `SELECT id, org_id, name, identifier, group_label, email, phone, metadata, created_at
-       FROM attendees WHERE org_id = $1 AND deleted_at IS NULL ORDER BY name LIMIT $2 OFFSET $3`,
-      [org.id, limit, offset]
-    );
-    const count = await query("SELECT COUNT(*) FROM attendees WHERE org_id = $1 AND deleted_at IS NULL", [org.id]);
-    ok(res, rows, { total: parseInt(count.rows[0].count), page, limit });
-  } catch (e) { err(res, 500, e.message); }
-});
+    const fetchAll = req.query.all === "true"; // 🆕 Flag to skip pagination boundaries
+    
+    // Extract search query and group/dept filter from query strings
+    const searchStr = req.query.search ? req.query.search.trim() : "";
+    const groupFilter = req.query.group_label ? req.query.group_label.trim() : "";
+    
+    let sqlParams = [org.id];
+    let whereClause = "WHERE org_id = $1 AND deleted_at IS NULL";
+    
+    // Dynamically append search criteria
+    if (searchStr) {
+      sqlParams.push(`%${searchStr}%`);
+      whereClause += ` AND (name ILIKE $${sqlParams.length} OR identifier ILIKE $${sqlParams.length} OR email ILIKE $${sqlParams.length})`;
+    }
+    
+    // Dynamically append department/group filter
+    if (groupFilter) {
+      sqlParams.push(groupFilter);
+      whereClause += ` AND group_label = $${sqlParams.length}`;
+    }
 
+    let dataQuery = `
+      SELECT id, org_id, name, identifier, group_label, email, phone, metadata, created_at
+      FROM attendees 
+      ${whereClause} 
+      ORDER BY name 
+    `;
+
+    // 🆕 If it's not fetching the full roster for a dropdown/portal panel, apply page limits
+    let rows;
+    if (!fetchAll) {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 50;
+      const offset = (page - 1) * limit;
+      
+      sqlParams.push(limit, offset);
+      dataQuery += ` LIMIT $${sqlParams.length - 1} OFFSET $${sqlParams.length}`;
+      
+      const response = await query(dataQuery, sqlParams);
+      rows = response.rows;
+      
+      // Get total matches for standard UI pagination calculations
+      const countParams = sqlParams.slice(1, sqlParams.length - 2); 
+      const countResult = await query(`SELECT COUNT(*) FROM attendees ${whereClause}`, [org.id, ...countParams]);
+      const total = parseInt(countResult.rows[0].count);
+
+      return ok(res, rows, { total, page, limit });
+    }
+
+    // Otherwise, execute unpaginated fetch for dashboard panels
+    const response = await query(dataQuery, sqlParams);
+    ok(res, response.rows);
+  } catch (e) { 
+    err(res, 500, e.message); 
+  }
+});
 api.post("/orgs/:orgId/attendees", async (req, res) => {
   try {
     const data = AttendeeSchema.parse(req.body);
@@ -402,10 +447,14 @@ api.delete("/orgs/:orgId/attendees/:id", async (req, res) => {
 
 // ── Events ─────────────────────────────────────────────────────────────────────
 // GET all events (admin + students see all; organizer sees only their own)
+// ── Events with Server-Side Filter and Substring Search ─────────────────────
 api.get("/orgs/:orgId/events", requireAuth, async (req, res) => {
   try {
     const org = await resolveOrg(req.params.orgId);
-    const params = [org.id];
+    const searchStr = req.query.search ? req.query.search.trim() : "";
+    const organizerFilter = req.query.organizer ? req.query.organizer.trim() : "";
+    
+    let params = [org.id];
  
     let sql = `
       SELECT e.*,
@@ -416,20 +465,41 @@ api.get("/orgs/:orgId/events", requireAuth, async (req, res) => {
       WHERE e.org_id = $1
     `;
  
-    // Organizers only see their own events — enforced server-side from JWT
+    // Server-side structural access control: Organizers only see their own work
     if (req.user.role === "organizer") {
       sql += ` AND e.created_by = $2`;
       params.push(req.user.userId);
     }
  
+    // Handle dynamic text matching on Event Name
+    if (searchStr) {
+      params.push(`%${searchStr}%`);
+      sql += ` AND e.name ILIKE $${params.length}`;
+    }
+
+    // Handle structural matching on Organizer/Department Label
+    if (organizerFilter) {
+      params.push(organizerFilter);
+      sql += ` AND e.organizer = $${params.length}`;
+    }
+ 
+    // Handle timeline scoping
     if (req.query.upcoming === "true") sql += " AND e.event_date >= CURRENT_DATE";
-    if (req.query.past    === "true") sql += " AND e.event_date < CURRENT_DATE";
+    if (req.query.past === "true")     sql += " AND e.event_date < CURRENT_DATE";
+    
+    // Handle explicit date ranges (ReportsView integration)
+    if (req.query.startDate && req.query.endDate) {
+      params.push(req.query.startDate, req.query.endDate);
+      sql += ` AND e.event_date BETWEEN $${params.length - 1} AND $${params.length}`;
+    }
  
     sql += " ORDER BY e.event_date DESC";
  
     const { rows } = await query(sql, params);
     ok(res, rows);
-  } catch (e) { err(res, 500, e.message); }
+  } catch (e) { 
+    err(res, 500, e.message); 
+  }
 });
 
 api.post("/orgs/:orgId/events", requireAuth, async (req, res) => {
@@ -649,6 +719,384 @@ async function resolveOrg(orgIdOrSlug) {
   if (!rows[0]) throw new Error("Organization not found");
   return rows[0];
 }
+// ═══════════════════════════════════════════════════════════════════
+// DAILY CLASS ATTENDANCE — Add these routes to your existing server.js
+// Place them BEFORE the `app.use("/api/v1", api)` line at the bottom.
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Schemas ───────────────────────────────────────────────────────
+const ClassSchema = z.object({
+  name:        z.string().min(1),
+  code:        z.string().optional(),
+  description: z.string().nullable().optional(),
+  group_label: z.string().optional(),
+});
+
+const SessionSchema = z.object({
+  session_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  session_time: z.string().nullable().optional(),
+  location:     z.string().nullable().optional(),
+  notes:        z.string().nullable().optional(),
+});
+
+const ClassCheckinSchema = z.object({
+  identifier:  z.string().optional(),
+  attendee_id: z.string().uuid().optional(),
+  method:      z.enum(["qr","manual","nfc","bulk"]).default("qr"),
+  notes:       z.string().optional(),
+});
+
+// ════════════════════════════════════════════════════════════════════
+// CLASSES — CRUD
+// ════════════════════════════════════════════════════════════════════
+
+// GET  /api/v1/orgs/:orgId/classes
+// Returns all classes for this org.
+// Organizers see only their own; admin sees all.
+api.get("/orgs/:orgId/classes", requireAuth, async (req, res) => {
+  try {
+    const org = await resolveOrg(req.params.orgId);
+    let sql = `
+      SELECT c.*,
+             u.email AS creator_email,
+             (SELECT COUNT(*) FROM class_sessions cs WHERE cs.class_id = c.id) AS session_count
+      FROM classes c
+      LEFT JOIN admin_users u ON u.id = c.created_by
+      WHERE c.org_id = $1 AND c.deleted_at IS NULL
+    `;
+    const params = [org.id];
+
+    if (req.user.role === "organizer") {
+      sql += ` AND c.created_by = $2`;
+      params.push(req.user.userId);
+    }
+
+    if (req.query.group_label) {
+      params.push(req.query.group_label);
+      sql += ` AND c.group_label = $${params.length}`;
+    }
+
+    if (req.query.search) {
+      params.push(`%${req.query.search.trim()}%`);
+      sql += ` AND (c.name ILIKE $${params.length} OR c.code ILIKE $${params.length})`;
+    }
+
+    sql += " ORDER BY c.name ASC";
+    const { rows } = await query(sql, params);
+    ok(res, rows);
+  } catch (e) { err(res, 500, e.message); }
+});
+
+// POST /api/v1/orgs/:orgId/classes
+api.post("/orgs/:orgId/classes", requireAuth, async (req, res) => {
+  try {
+    const data = ClassSchema.parse(req.body);
+    const org  = await resolveOrg(req.params.orgId);
+    const { rows } = await query(
+      `INSERT INTO classes (org_id, name, code, description, group_label, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [org.id, data.name, data.code, data.description, data.group_label, req.user.userId]
+    );
+    ok(res, rows[0]);
+  } catch (e) { err(res, 400, e.message); }
+});
+
+// GET  /api/v1/orgs/:orgId/classes/:id
+api.get("/orgs/:orgId/classes/:id", requireAuth, async (req, res) => {
+  try {
+    const org = await resolveOrg(req.params.orgId);
+    const { rows } = await query(
+      `SELECT c.*, u.email AS creator_email FROM classes c
+       LEFT JOIN admin_users u ON u.id = c.created_by
+       WHERE c.id = $1 AND c.org_id = $2 AND c.deleted_at IS NULL`,
+      [req.params.id, org.id]
+    );
+    if (!rows[0]) return err(res, 404, "Class not found");
+    ok(res, rows[0]);
+  } catch (e) { err(res, 500, e.message); }
+});
+
+// PUT  /api/v1/orgs/:orgId/classes/:id
+api.put("/orgs/:orgId/classes/:id", requireAuth, async (req, res) => {
+  try {
+    const data = ClassSchema.partial().parse(req.body);
+    const org  = await resolveOrg(req.params.orgId);
+    const { rows } = await query(
+      `UPDATE classes SET
+         name        = COALESCE($3, name),
+         code        = COALESCE($4, code),
+         description = COALESCE($5, description),
+         group_label = COALESCE($6, group_label)
+       WHERE id = $1 AND org_id = $2 AND deleted_at IS NULL RETURNING *`,
+      [req.params.id, org.id, data.name, data.code, data.description, data.group_label]
+    );
+    if (!rows[0]) return err(res, 404, "Class not found");
+    ok(res, rows[0]);
+  } catch (e) { err(res, 400, e.message); }
+});
+
+// DELETE /api/v1/orgs/:orgId/classes/:id  (soft delete)
+api.delete("/orgs/:orgId/classes/:id", requireAuth, async (req, res) => {
+  try {
+    const org = await resolveOrg(req.params.orgId);
+    await query(
+      "UPDATE classes SET deleted_at = NOW() WHERE id = $1 AND org_id = $2",
+      [req.params.id, org.id]
+    );
+    ok(res, { deleted: true });
+  } catch (e) { err(res, 500, e.message); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// CLASS SESSIONS — one session = one class on one specific date
+// ════════════════════════════════════════════════════════════════════
+
+// GET  /api/v1/orgs/:orgId/classes/:classId/sessions
+// Returns all sessions for a class, newest first.
+// Each session row also includes how many students checked in.
+api.get("/orgs/:orgId/classes/:classId/sessions", requireAuth, async (req, res) => {
+  try {
+    const org = await resolveOrg(req.params.orgId);
+    const { rows } = await query(
+      `SELECT cs.*,
+              (SELECT COUNT(*) FROM class_attendance ca WHERE ca.session_id = cs.id) AS checkin_count
+       FROM class_sessions cs
+       WHERE cs.class_id = $1 AND cs.org_id = $2
+       ORDER BY cs.session_date DESC, cs.session_time DESC`,
+      [req.params.classId, org.id]
+    );
+    ok(res, rows);
+  } catch (e) { err(res, 500, e.message); }
+});
+
+// POST /api/v1/orgs/:orgId/classes/:classId/sessions
+// Create a new session (e.g. "Today's class")
+api.post("/orgs/:orgId/classes/:classId/sessions", requireAuth, async (req, res) => {
+  try {
+    const data = SessionSchema.parse(req.body);
+    const org  = await resolveOrg(req.params.orgId);
+    const { rows } = await query(
+      `INSERT INTO class_sessions (class_id, org_id, session_date, session_time, location, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [req.params.classId, org.id, data.session_date, data.session_time, data.location, data.notes, req.user.userId]
+    );
+    ok(res, rows[0]);
+  } catch (e) { err(res, 400, e.message); }
+});
+
+// DELETE /api/v1/orgs/:orgId/classes/:classId/sessions/:sessionId
+api.delete("/orgs/:orgId/classes/:classId/sessions/:sessionId", requireAuth, async (req, res) => {
+  try {
+    await query("DELETE FROM class_sessions WHERE id = $1", [req.params.sessionId]);
+    ok(res, { deleted: true });
+  } catch (e) { err(res, 500, e.message); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// CLASS CHECK-IN (QR scan or manual)
+// POST /api/v1/orgs/:orgId/classes/:classId/sessions/:sessionId/checkin
+//
+// KEY DIFFERENCE from events:
+//   - The same student CAN check in to multiple sessions of the same class
+//     (different dates). Each session has its own attendance record.
+//   - But they CANNOT check in twice to the SAME session (unique constraint).
+// ════════════════════════════════════════════════════════════════════
+
+api.post(
+  "/orgs/:orgId/classes/:classId/sessions/:sessionId/checkin",
+  async (req, res) => {
+    try {
+      const data = ClassCheckinSchema.parse(req.body);
+      const org  = await resolveOrg(req.params.orgId);
+
+      // Resolve attendee by identifier or UUID
+      let attendeeId = data.attendee_id;
+      if (!attendeeId && data.identifier) {
+        const { rows } = await query(
+          `SELECT id FROM attendees
+           WHERE org_id = $1 AND (identifier = $2 OR id::text = $2) AND deleted_at IS NULL`,
+          [org.id, data.identifier]
+        );
+        if (!rows[0]) return err(res, 404, "Attendee not found");
+        attendeeId = rows[0].id;
+      }
+
+      const { rows } = await query(
+        `INSERT INTO class_attendance (session_id, attendee_id, method, checked_in_by, notes)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (session_id, attendee_id) DO NOTHING
+         RETURNING *`,
+        [req.params.sessionId, attendeeId, data.method, "system", data.notes]
+      );
+
+      if (!rows[0]) return err(res, 409, "Student already checked in to this session");
+      ok(res, rows[0]);
+    } catch (e) { err(res, 400, e.message); }
+  }
+);
+
+// GET  /api/v1/orgs/:orgId/classes/:classId/sessions/:sessionId/attendance
+// Who checked in to a specific session?
+api.get(
+  "/orgs/:orgId/classes/:classId/sessions/:sessionId/attendance",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { rows } = await query(
+        `SELECT ca.*, at.name, at.identifier, at.group_label, at.email
+         FROM class_attendance ca
+         JOIN attendees at ON at.id = ca.attendee_id
+         WHERE ca.session_id = $1
+         ORDER BY ca.checked_in_at`,
+        [req.params.sessionId]
+      );
+      ok(res, rows);
+    } catch (e) { err(res, 500, e.message); }
+  }
+);
+
+// DELETE /api/v1/orgs/:orgId/classes/.../attendance/:attendeeId
+// Remove a check-in from a session
+api.delete(
+  "/orgs/:orgId/classes/:classId/sessions/:sessionId/attendance/:attendeeId",
+  requireAuth,
+  async (req, res) => {
+    try {
+      await query(
+        "DELETE FROM class_attendance WHERE session_id = $1 AND attendee_id = $2",
+        [req.params.sessionId, req.params.attendeeId]
+      );
+      ok(res, { deleted: true });
+    } catch (e) { err(res, 500, e.message); }
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// STUDENT — View own class attendance across ALL sessions
+// GET /api/v1/orgs/:orgId/attendees/:id/my-class-attendance
+// Returns every session this student checked in to, grouped-friendly
+// ════════════════════════════════════════════════════════════════════
+
+api.get("/orgs/:orgId/attendees/:id/my-class-attendance", async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT
+         ca.id,
+         ca.checked_in_at,
+         ca.method,
+         cs.id         AS session_id,
+         cs.session_date,
+         cs.session_time,
+         cs.location   AS session_location,
+         c.id          AS class_id,
+         c.name        AS class_name,
+         c.code        AS class_code,
+         c.group_label AS class_group
+       FROM class_attendance ca
+       JOIN class_sessions cs ON cs.id = ca.session_id
+       JOIN classes c         ON c.id  = cs.class_id
+       WHERE ca.attendee_id = $1
+       ORDER BY cs.session_date DESC, ca.checked_in_at DESC`,
+      [req.params.id]
+    );
+    ok(res, rows);
+  } catch (e) { err(res, 500, e.message); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// ADMIN/ORGANIZER — Full attendance sheet for a class (all sessions + all students)
+// GET /api/v1/orgs/:orgId/classes/:classId/full-attendance
+// Returns a pivot-friendly list: each row = student, with dates they attended
+// ════════════════════════════════════════════════════════════════════
+
+api.get("/orgs/:orgId/classes/:classId/full-attendance", requireAuth, async (req, res) => {
+  try {
+    const org = await resolveOrg(req.params.orgId);
+
+    // All sessions for this class
+    const { rows: sessions } = await query(
+      `SELECT id, session_date, session_time, location
+       FROM class_sessions WHERE class_id = $1 ORDER BY session_date`,
+      [req.params.classId]
+    );
+
+    // All check-ins for this class
+    const { rows: checkins } = await query(
+      `SELECT ca.attendee_id, ca.session_id, ca.checked_in_at, ca.method,
+              at.name, at.identifier, at.group_label, at.email
+       FROM class_attendance ca
+       JOIN attendees at ON at.id = ca.attendee_id
+       JOIN class_sessions cs ON cs.id = ca.session_id
+       WHERE cs.class_id = $1
+       ORDER BY at.name`,
+      [req.params.classId]
+    );
+
+    // Build a map: attendee_id -> { info, sessions_attended: Set }
+    const studentMap = {};
+    for (const row of checkins) {
+      if (!studentMap[row.attendee_id]) {
+        studentMap[row.attendee_id] = {
+          attendee_id: row.attendee_id,
+          name: row.name,
+          identifier: row.identifier,
+          group_label: row.group_label,
+          email: row.email,
+          sessions_attended: [],
+        };
+      }
+      studentMap[row.attendee_id].sessions_attended.push({
+        session_id: row.session_id,
+        checked_in_at: row.checked_in_at,
+        method: row.method,
+      });
+    }
+
+    ok(res, {
+      sessions,
+      students: Object.values(studentMap),
+    });
+  } catch (e) { err(res, 500, e.message); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// REPORTS — Export class attendance as CSV
+// GET /api/v1/orgs/:orgId/classes/:classId/export?fmt=csv
+// ════════════════════════════════════════════════════════════════════
+
+api.get("/orgs/:orgId/classes/:classId/export", requireAuth, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT
+         at.name, at.identifier, at.group_label, at.email,
+         c.name AS class_name, c.code AS class_code,
+         cs.session_date, cs.location,
+         ca.checked_in_at, ca.method
+       FROM class_attendance ca
+       JOIN class_sessions cs ON cs.id = ca.session_id
+       JOIN classes c         ON c.id  = cs.class_id
+       JOIN attendees at      ON at.id = ca.attendee_id
+       WHERE cs.class_id = $1
+       ORDER BY cs.session_date ASC, at.name`,
+      [req.params.classId]
+    );
+
+    const fmt = req.query.fmt || "json";
+    if (fmt === "csv") {
+      const header = ["Name","Identifier","Group","Email","Class","Code","Session Date","Location","Checked In At","Method"];
+      const csvRows = rows.map(r => [
+        r.name, r.identifier, r.group_label, r.email,
+        r.class_name, r.class_code, r.session_date, r.location,
+        r.checked_in_at, r.method
+      ].join(","));
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename=class_attendance.csv`);
+      res.send([header.join(","), ...csvRows].join("\n"));
+    } else {
+      ok(res, rows);
+    }
+  } catch (e) { err(res, 500, e.message); }
+});
 
 app.use("/api/v1", api);
 const PORT = process.env.PORT || 3001;
