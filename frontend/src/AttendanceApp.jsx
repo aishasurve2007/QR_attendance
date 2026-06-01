@@ -1078,8 +1078,17 @@ export default function AttendanceApp() {
   const [view,       setView]       = useState("dashboard");
 
   useEffect(() => {
-    apiFetch(`${BASE_URL}/orgs/${ORG_ID}`).then(data => { setApiAvailable(true); if (data.attendee_label) setOrgConfig({ attendeeLabel: data.attendee_label }); if (data.name) setOrgConfig({ orgName: data.name }); }).catch(() => setApiAvailable(false));
-  }, []);
+  apiFetch(`${BASE_URL}/orgs/${ORG_ID}`)
+    .then(data => {
+      setApiAvailable(true);
+      setOrgConfigState(prev => ({
+        ...prev,
+        ...(data.attendee_label && { attendeeLabel: data.attendee_label }),
+        ...(data.name && { orgName: data.name }),
+      }));
+    })
+    .catch(() => setApiAvailable(false));
+}, []);
 
   useEffect(() => {
     if (!apiAvailable || role !== "admin") return;
@@ -1116,9 +1125,6 @@ export default function AttendanceApp() {
     { id: "organizers", label: "Organizers",                        icon: "🏛" },
     { id: "settings",   label: "Settings",                          icon: "⚙️" },
   ];
-  if (!isLoggedIn) return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-  if (role === "student") return <StudentDashboard onLogout={handleLogout} />;
-  if (role === "organizer") return <OrganizerDashboard onLogout={handleLogout} />;
 
   return (
     <OrgContext.Provider value={{ ...orgConfig, setOrgConfig }}>
