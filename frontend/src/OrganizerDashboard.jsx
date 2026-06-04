@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import ClassesView from "./ClassesView";
 const BASE_URL = "https://attendiq-api.onrender.com/api/v1";
 const ORG_ID = "demo-org";
 
@@ -329,6 +330,7 @@ export default function OrganizerDashboard({ onLogout }) {
 
   const navItems = [
     { id: "events",     label: "My Events",  icon: "📅" },
+    { id: "classes",    label: "Classes",    icon: "📚" },
     { id: "attendance", label: "Attendance", icon: "✅" },
     { id: "reports",    label: "Reports",    icon: "📊" },
     { id: "security",   label: "Security",   icon: "🔐" },
@@ -375,9 +377,11 @@ export default function OrganizerDashboard({ onLogout }) {
       </div>
 
       {/* ── Main ── */}
+      
       <div style={{ flex: 1, padding: 28, overflowY: "auto", maxHeight: "100vh" }}>
 
         {/* ── MY EVENTS ── */}
+        {view === "classes" && <ClassesView orgId={ORG_ID} />}
         {view === "events" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22 }}>
@@ -432,6 +436,7 @@ export default function OrganizerDashboard({ onLogout }) {
         )}
 
         {/* ── ATTENDANCE ── */}
+        
         {view === "attendance" && (
           <div>
             <div style={{ marginBottom: 22 }}>

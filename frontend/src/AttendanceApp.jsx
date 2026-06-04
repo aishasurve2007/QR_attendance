@@ -16,7 +16,7 @@ import {
   ResponsiveContainer, BarChart, Bar, CartesianGrid,
   XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend
 } from "recharts";
-
+import AdminStudentAttendanceView from "./AdminStudentAttendanceView";
 // ─── Context ──────────────────────────────────────────────────────────────────
 const OrgContext = createContext({
   orgId: "demo-org", orgName: "AttendIQ College",
@@ -1120,6 +1120,7 @@ export default function AttendanceApp() {
     { id: "dashboard",  label: "Dashboard",                         icon: "▦" },
     { id: "events",     label: "Events",                            icon: "📅" },
     { id: "students",   label: `${orgConfig.attendeeLabel}s`,       icon: "🎓" },
+    { id: "studentatt", label: "Student Attendance", icon: "🧑‍🎓" },
     { id: "reports",    label: "Reports",                           icon: "📊" },
     { id: "portal",     label: `${orgConfig.attendeeLabel} Portal`, icon: "👤" },
     { id: "organizers", label: "Organizers",                        icon: "🏛" },
@@ -1169,6 +1170,7 @@ export default function AttendanceApp() {
           {view === "organizers" && <OrganizersView />}
           {view === "dashboard"  && <Dashboard students={students} events={events} attendance={attendance} loading={loading} />}
           {view === "events"     && <EventsView events={events} setEvents={setEvents} students={students} attendance={attendance} setAttendance={setAttendance} apiAvailable={apiAvailable} orgId={ORG_ID} />}
+          {view === "studentatt" && <AdminStudentAttendanceView orgId={ORG_ID} />}
           {view === "students"   && <StudentsView students={students} setStudents={setStudents} attendance={attendance} events={events} loading={loading} apiAvailable={apiAvailable} orgId={ORG_ID} />}
           {view === "reports"    && <ReportsView students={students} events={events} attendance={attendance} loading={loading} orgId={ORG_ID} apiAvailable={apiAvailable} />}
           {view === "portal"     && <StudentPortal students={students} attendance={attendance} events={events} loading={loading} />}

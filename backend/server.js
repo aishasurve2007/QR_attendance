@@ -17,7 +17,16 @@ async function query(text, params) {
   const client = await pool.connect();
   try { return await client.query(text, params); } finally { client.release(); }
 }
-
+async function assertClassAccess(req, classId, orgId) {
+  const { rows } = await query(
+    "SELECT created_by FROM classes WHERE id = $1 AND org_id = $2 AND deleted_at IS NULL",
+    [classId, orgId]
+  );
+  if (!rows[0]) { const e = new Error("Class not found"); e.status = 404; throw e; }
+  if (req.user.role === "organizer" && rows[0].created_by !== req.user.userId) {
+    const e = new Error("Forbidden"); e.status = 403; throw e;
+  }
+}
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ok(res, data, meta = {}) { res.json({ data, error: null, meta }); }
 function err(res, status, message) { res.status(status).json({ data: null, error: message, meta: {} }); }
@@ -301,7 +310,7 @@ api.patch("/orgs/:orgId", async (req, res) => {
 // ── Attendees ─────────────────────────────────────────────────────────────────
 // ── Attendees with Server-Side Search, Filter, and Pagination ────────────────
 // ── Attendees with Optional Unpaginated Fetch for Dropdowns ────────────────
-api.get("/orgs/:orgId/attendees", async (req, res) => {
+api.get("/orgs/:orgId/attendees", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
     const org = await resolveOrg(req.params.orgId);
     const fetchAll = req.query.all === "true"; // 🆕 Flag to skip pagination boundaries
@@ -403,7 +412,9 @@ api.post("/orgs/:orgId/attendees/bulk", async (req, res) => {
   } catch (e) { err(res, 400, e.message); }
 });
 
-api.get("/orgs/:orgId/attendees/:id", async (req, res) => {
+api.get("/orgs/:orgId/attendees/:id", requireAuth, async (req, res) => {
+  if (req.user.role === "student" && req.user.userId !== req.params.id)
+    return err(res, 403, "Forbidden");
   try {
     const org = await resolveOrg(req.params.orgId);
     const { rows } = await query(
@@ -556,7 +567,7 @@ api.delete("/orgs/:orgId/events/:id", async (req, res) => {
 });
 
 // ── Attendance ────────────────────────────────────────────────────────────────
-api.post("/orgs/:orgId/events/:id/checkin", async (req, res) => {
+api.post("/orgs/:orgId/events/:id/checkin", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
     const data = CheckinSchema.parse(req.body);
     const org = await resolveOrg(req.params.orgId);
@@ -573,7 +584,7 @@ api.post("/orgs/:orgId/events/:id/checkin", async (req, res) => {
       `INSERT INTO attendance (event_id, attendee_id, method, checked_in_by, notes)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (event_id, attendee_id) DO NOTHING RETURNING *`,
-      [req.params.id, attendeeId, data.method, req.body._checked_in_by || "system", data.notes]
+      [req.params.id, attendeeId, data.method, req.user.email || req.user.userId || "system", data.notes]
     );
     if (!rows[0]) return err(res, 409, "Already checked in");
     ok(res, rows[0]);
@@ -600,7 +611,9 @@ api.delete("/orgs/:orgId/events/:id/attendance/:attId", async (req, res) => {
 });
 
 // ── Student own attendance ────────────────────────────────────────────────────
-api.get("/orgs/:orgId/attendees/:id/my-attendance", async (req, res) => {
+api.get("/orgs/:orgId/attendees/:id/my-attendance", requireAuth, async (req, res) => {
+  if (req.user.role === "student" && req.user.userId !== req.params.id)
+    return err(res, 403, "Forbidden");
   try {
     const { rows } = await query(
       `SELECT a.id, a.checked_in_at, a.method,
@@ -788,7 +801,7 @@ api.get("/orgs/:orgId/classes", requireAuth, async (req, res) => {
 });
 
 // POST /api/v1/orgs/:orgId/classes
-api.post("/orgs/:orgId/classes", requireAuth, async (req, res) => {
+api.post("/orgs/:orgId/classes", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
     const data = ClassSchema.parse(req.body);
     const org  = await resolveOrg(req.params.orgId);
@@ -817,7 +830,7 @@ api.get("/orgs/:orgId/classes/:id", requireAuth, async (req, res) => {
 });
 
 // PUT  /api/v1/orgs/:orgId/classes/:id
-api.put("/orgs/:orgId/classes/:id", requireAuth, async (req, res) => {
+api.put("/orgs/:orgId/classes/:id", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
     const data = ClassSchema.partial().parse(req.body);
     const org  = await resolveOrg(req.params.orgId);
@@ -836,7 +849,7 @@ api.put("/orgs/:orgId/classes/:id", requireAuth, async (req, res) => {
 });
 
 // DELETE /api/v1/orgs/:orgId/classes/:id  (soft delete)
-api.delete("/orgs/:orgId/classes/:id", requireAuth, async (req, res) => {
+api.delete("/orgs/:orgId/classes/:id", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
     const org = await resolveOrg(req.params.orgId);
     await query(
@@ -871,7 +884,7 @@ api.get("/orgs/:orgId/classes/:classId/sessions", requireAuth, async (req, res) 
 
 // POST /api/v1/orgs/:orgId/classes/:classId/sessions
 // Create a new session (e.g. "Today's class")
-api.post("/orgs/:orgId/classes/:classId/sessions", requireAuth, async (req, res) => {
+api.post("/orgs/:orgId/classes/:classId/sessions", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
     const data = SessionSchema.parse(req.body);
     const org  = await resolveOrg(req.params.orgId);
@@ -885,9 +898,14 @@ api.post("/orgs/:orgId/classes/:classId/sessions", requireAuth, async (req, res)
 });
 
 // DELETE /api/v1/orgs/:orgId/classes/:classId/sessions/:sessionId
-api.delete("/orgs/:orgId/classes/:classId/sessions/:sessionId", requireAuth, async (req, res) => {
+api.delete("/orgs/:orgId/classes/:classId/sessions/:sessionId", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
-    await query("DELETE FROM class_sessions WHERE id = $1", [req.params.sessionId]);
+    const org = await resolveOrg(req.params.orgId);
+    const { rowCount } = await query(
+      "DELETE FROM class_sessions WHERE id = $1 AND class_id = $2 AND org_id = $3",
+      [req.params.sessionId, req.params.classId, org.id]
+    );
+    if (!rowCount) return err(res, 404, "Session not found");
     ok(res, { deleted: true });
   } catch (e) { err(res, 500, e.message); }
 });
@@ -904,6 +922,8 @@ api.delete("/orgs/:orgId/classes/:classId/sessions/:sessionId", requireAuth, asy
 
 api.post(
   "/orgs/:orgId/classes/:classId/sessions/:sessionId/checkin",
+  requireAuth,
+  requireRole("organizer", "admin"),
   async (req, res) => {
     try {
       const data = ClassCheckinSchema.parse(req.body);
@@ -926,7 +946,7 @@ api.post(
          VALUES ($1,$2,$3,$4,$5)
          ON CONFLICT (session_id, attendee_id) DO NOTHING
          RETURNING *`,
-        [req.params.sessionId, attendeeId, data.method, "system", data.notes]
+        [req.params.sessionId, attendeeId, data.method, req.user.email || req.user.userId || "system", data.notes]
       );
 
       if (!rows[0]) return err(res, 409, "Student already checked in to this session");
@@ -957,10 +977,7 @@ api.get(
 
 // DELETE /api/v1/orgs/:orgId/classes/.../attendance/:attendeeId
 // Remove a check-in from a session
-api.delete(
-  "/orgs/:orgId/classes/:classId/sessions/:sessionId/attendance/:attendeeId",
-  requireAuth,
-  async (req, res) => {
+api.delete("/orgs/:orgId/classes/:classId/sessions/:sessionId/attendance/:attendeeId", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
     try {
       await query(
         "DELETE FROM class_attendance WHERE session_id = $1 AND attendee_id = $2",
@@ -977,7 +994,9 @@ api.delete(
 // Returns every session this student checked in to, grouped-friendly
 // ════════════════════════════════════════════════════════════════════
 
-api.get("/orgs/:orgId/attendees/:id/my-class-attendance", async (req, res) => {
+api.get("/orgs/:orgId/attendees/:id/my-class-attendance", requireAuth, async (req, res) => {
+  if (req.user.role === "student" && req.user.userId !== req.params.id)
+    return err(res, 403, "Forbidden");
   try {
     const { rows } = await query(
       `SELECT
@@ -1009,7 +1028,7 @@ api.get("/orgs/:orgId/attendees/:id/my-class-attendance", async (req, res) => {
 // Returns a pivot-friendly list: each row = student, with dates they attended
 // ════════════════════════════════════════════════════════════════════
 
-api.get("/orgs/:orgId/classes/:classId/full-attendance", requireAuth, async (req, res) => {
+api.get("/orgs/:orgId/classes/:classId/full-attendance", requireAuth, requireRole("organizer", "admin"), async (req, res) => {
   try {
     const org = await resolveOrg(req.params.orgId);
 
