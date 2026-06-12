@@ -162,7 +162,7 @@ function Badge({ color = "blue", children }) {
 }
 function StatCard({ icon, label, value, accent }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 16, flex: "1 1 160px" }}>
+    <div className="iq-stat" style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 16, flex: "1 1 160px" }}>
       <div style={{ width: 46, height: 46, borderRadius: 12, background: accent + "18", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{icon}</div>
       <div>
         <div style={{ fontSize: 26, fontWeight: 800, color: "#111", fontFamily: "'Playfair Display', serif", lineHeight: 1 }}>{value}</div>
@@ -175,7 +175,7 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: 32, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.18)", animation: "slideUp 0.22s ease", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+      <div className="iq-modal" style={{ background: "#fff", borderRadius: 20, padding: 32, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.18)", animation: "slideUp 0.22s ease", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, fontFamily: "'Playfair Display', serif" }}>{title}</h3>
           <button onClick={onClose} style={{ background: "#f5f5f5", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16 }}>×</button>
@@ -309,7 +309,7 @@ function OrganizersView() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display', serif", color: "#111" }}>Organizers</h2>
           <p style={{ color: "#888", margin: "6px 0 0", fontSize: 14 }}>Manage event organizer accounts</p>
@@ -448,7 +448,7 @@ function Dashboard({ students, events, attendance, loading }) {
         <p style={{ color: "#888", margin: "6px 0 0", fontSize: 14 }}>Real-time attendance insights across all events</p>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 28 }}>
-        {loading ? Array(4).fill(0).map((_, i) => <div key={i} style={{ flex: "1 1 160px", background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #f0f0f0" }}><Skeleton height={46} width={46} radius={12} style={{ marginBottom: 12 }} /><Skeleton height={26} width="60%" style={{ marginBottom: 6 }} /><Skeleton height={12} width="80%" /></div>) : (
+        {loading ? Array(4).fill(0).map((_, i) => <div key={i} className="iq-stat" style={{ flex: "1 1 160px", background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #f0f0f0" }}><Skeleton height={46} width={46} radius={12} style={{ marginBottom: 12 }} /><Skeleton height={26} width="60%" style={{ marginBottom: 6 }} /><Skeleton height={12} width="80%" /></div>) : (
           <>
             <StatCard icon="🎓" label={`Total ${attendeeLabel}s`} value={students.length} accent="#6366f1" />
             <StatCard icon="📅" label="Events Created" value={events.length} accent="#f59e0b" />
@@ -457,7 +457,7 @@ function Dashboard({ students, events, attendance, loading }) {
           </>
         )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="iq-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", gridColumn: "1 / -1" }}>
           <h4 style={{ margin: "0 0 18px", fontFamily: "'Playfair Display', serif", fontSize: 17 }}>Recent Check-ins</h4>
           {loading ? <TableSkeleton rows={5} cols={4} /> : (
@@ -561,7 +561,7 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div><h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display', serif", color: "#111" }}>Events</h2><p style={{ color: "#888", margin: "6px 0 0", fontSize: 14 }}>{events.length} events • {attendance.length} total check-ins</p></div>
         <Btn onClick={() => { setShowCreate(true); setEditId(null); setForm({ name: "", date: "", time: "", location: "", organizer: "" }); }}>＋ New Event</Btn>
       </div>
@@ -596,7 +596,7 @@ function EventsView({ events, setEvents, students, attendance, setAttendance, ap
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={editId ? "Edit Event" : "Create New Event"}>
         <ErrorBanner message={apiError} />
         <Input label="Event Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Tech Summit 2025" />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="iq-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Input label="Date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
           <Input label="Time" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
         </div>
@@ -681,12 +681,12 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
   });
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div><h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display', serif" }}>{attendeeLabel}s</h2><p style={{ color: "#888", margin: "6px 0 0", fontSize: 14 }}>{students.length} registered {attendeeLabel.toLowerCase()}s</p></div>
-        <div style={{ display: "flex", gap: 10 }}><Btn variant="secondary" onClick={() => setShowBulk(true)}>⬆ Import CSV</Btn><Btn onClick={() => setShowAdd(true)}>＋ Add {attendeeLabel}</Btn></div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}><Btn variant="secondary" onClick={() => setShowBulk(true)}>⬆ Import CSV</Btn><Btn onClick={() => setShowAdd(true)}>＋ Add {attendeeLabel}</Btn></div>
       </div>
       <ErrorBanner message={apiError} />
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, maxWidth: 520 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, maxWidth: 520, flexWrap: "wrap" }}>
         <input 
           type="text" 
           placeholder={`Search by name or ${identifierLabel}...`}
@@ -765,7 +765,7 @@ function AttendanceCharts({ students, events, attendance }) {
   const pieData = Object.entries(groupData).map(([name, value]) => ({ name, value }));
   const COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ec4899", "#3b82f6", "#8b5cf6"];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+    <div className="iq-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
       <div style={{ background: "#fff", padding: 20 }}><h4>Check-ins Per Event</h4><ResponsiveContainer width="100%" height={220}><BarChart data={eventData} margin={{ bottom: 40 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" interval={0} angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} /><YAxis /><Tooltip /><Bar dataKey="checkins" fill="#6366f1" /></BarChart></ResponsiveContainer></div>
       <div style={{ background: "#fff", padding: 20 }}><h4>Attendance by {attendeeLabel}</h4><ResponsiveContainer width="100%" height={220}><PieChart><Pie data={pieData} dataKey="value">{pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></div>
       <div style={{ gridColumn: "1 / -1", background: "#fff", padding: 20 }}><h4>Attendance vs Capacity</h4><ResponsiveContainer width="100%" height={220}><BarChart data={eventData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="displayName" interval={0} angle={-25} textAnchor="end" height={60} tick={{ fontSize: 11 }} /><YAxis /><Tooltip /><Bar dataKey="checkins" fill="#10b981" /><Bar dataKey="capacity" fill="#e0e0e0" /></BarChart></ResponsiveContainer></div>
@@ -798,16 +798,16 @@ function ReportsView({ students, events, attendance, loading, orgId, apiAvailabl
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div><h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display', serif" }}>Reports</h2><p style={{ color: "#888", margin: "6px 0 0", fontSize: 14 }}>Export and analyze attendance data</p></div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <select value={selectedEvent} onChange={e => setSelectedEvent(e.target.value)} style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer" }}><option value="all">All Events</option>{events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
           <Btn onClick={exportCSV} variant="success">⬇ Export CSV</Btn><Btn onClick={exportPDF} variant="primary">⬇ Export PDF</Btn>
         </div>
       </div>
       <AttendanceCharts students={students} events={events} attendance={attendance} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 24 }}>
-        {loading ? Array(3).fill(0).map((_, i) => <div key={i} style={{ flex: "1 1 160px", background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #f0f0f0" }}><Skeleton height={40} /></div>) : <><StatCard icon="📋" label="Records Shown" value={filtered.length} accent="#6366f1" /><StatCard icon="🎓" label={`Unique ${attendeeLabel}s`} value={new Set(filtered.map(a => a.studentId || a.attendee_id)).size} accent="#10b981" /><StatCard icon="📅" label="Events Covered" value={new Set(filtered.map(a => a.eventId || a.event_id)).size} accent="#f59e0b" /></>}
+        {loading ? Array(3).fill(0).map((_, i) => <div key={i} className="iq-stat" style={{ flex: "1 1 160px", background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #f0f0f0" }}><Skeleton height={40} /></div>) : <><StatCard icon="📋" label="Records Shown" value={filtered.length} accent="#6366f1" /><StatCard icon="🎓" label={`Unique ${attendeeLabel}s`} value={new Set(filtered.map(a => a.studentId || a.attendee_id)).size} accent="#10b981" /><StatCard icon="📅" label="Events Covered" value={new Set(filtered.map(a => a.eventId || a.event_id)).size} accent="#f59e0b" /></>}
       </div>
       <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0f0f0", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -864,7 +864,7 @@ function StudentPortal({ students, attendance, events, loading }) {
       </div>
 
       {/* 🆕 CONTROL BAR PLACEHERE: Search and Group Filter Input Elements */}
-      <div style={{ display: "flex", gap: "12px", marginBottom: "16px", maxWidth: "500px" }}>
+      <div style={{ display: "flex", gap: "12px", marginBottom: "16px", maxWidth: "500px", flexWrap: "wrap" }}>
         <input 
           type="text" 
           placeholder={`Search by name or ${attendeeLabel} ID...`}
@@ -898,10 +898,10 @@ function StudentPortal({ students, attendance, events, loading }) {
         </select>
       </div>
 
-      {loading && <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}><Skeleton height={400} radius={20} /><Skeleton height={400} radius={20} /></div>}
+      {loading && <div className="iq-grid-2" style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}><Skeleton height={400} radius={20} /><Skeleton height={400} radius={20} /></div>}
       
       {!loading && student && (
-        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}>
+        <div className="iq-grid-2" style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}>
           <div style={{ background: "#fff", borderRadius: 20, padding: 28, border: "1px solid #f0f0f0", boxShadow: "0 1px 3px rgba(0,0,0,0.07)", textAlign: "center" }}>
             <div style={{ width: 72, height: 72, borderRadius: "50%", margin: "0 auto 16px", background: `hsl(${student.name.charCodeAt(0) * 5}, 60%, 88%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 900, color: `hsl(${student.name.charCodeAt(0) * 5}, 50%, 35%)` }}>{student.name[0]}</div>
             <h3 style={{ margin: "0 0 4px", fontFamily: "'Playfair Display', serif", fontSize: 19 }}>{student.name}</h3>
@@ -1076,6 +1076,15 @@ export default function AttendanceApp() {
   const [attendance, setAttendance] = useState(MOCK_ATTENDANCE);
   const [loading,    setLoading]    = useState(false);
   const [view,       setView]       = useState("dashboard");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Ensure the layout viewport matches the device width, otherwise phones
+  // render at ~980px and the responsive breakpoints never fire.
+  useEffect(() => {
+    let m = document.querySelector('meta[name="viewport"]');
+    if (!m) { m = document.createElement("meta"); m.name = "viewport"; document.head.appendChild(m); }
+    m.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover");
+  }, []);
 
   useEffect(() => {
   apiFetch(`${BASE_URL}/orgs/${ORG_ID}`)
@@ -1129,7 +1138,7 @@ export default function AttendanceApp() {
 
   return (
     <OrgContext.Provider value={{ ...orgConfig, setOrgConfig }}>
-      <div style={{ fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif", background: "#f7f7f8", minHeight: "100vh", display: "flex" }}>
+      <div className="iq-shell" style={{ fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif", background: "#f7f7f8", minHeight: "100vh", display: "flex" }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
           @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
@@ -1137,10 +1146,48 @@ export default function AttendanceApp() {
           * { box-sizing: border-box; }
           ::-webkit-scrollbar { width: 6px; }
           ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 3px; }
+
+          /* ── Mobile responsive (drawer pattern) ── */
+          .iq-topbar { display: none; }
+          @media (max-width: 768px) {
+            .iq-sidebar {
+              position: fixed !important;
+              top: 0; left: 0;
+              height: 100vh !important;
+              z-index: 1100;
+              transform: translateX(-100%);
+              transition: transform 0.25s ease;
+              box-shadow: 0 0 50px rgba(0,0,0,0.20);
+            }
+            .iq-sidebar.iq-open { transform: translateX(0); }
+            .iq-topbar { display: flex !important; }
+            .iq-content { padding: 16px !important; max-height: none !important; overflow: visible !important; }
+            .iq-grid-2 { grid-template-columns: 1fr !important; }
+            /* CSS-only responsive tables: wide tables scroll instead of breaking layout */
+            .iq-content table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+            .iq-modal { padding: 20px !important; }
+            .iq-content h2 { font-size: 22px !important; }
+          }
+
+          /* ── Phone tier (tighter than tablet) ── */
+          @media (max-width: 480px) {
+            .iq-content { padding: 12px !important; }
+            .iq-stat { flex: 1 1 100% !important; }          /* one stat card per row */
+            .iq-content select { width: 100% !important; min-width: 0 !important; }
+            .iq-content h2 { font-size: 20px !important; }
+            .iq-modal { padding: 16px !important; }
+            .iq-sidebar { width: 84vw !important; max-width: 300px; }  /* drawer not full-bleed */
+          }
         `}</style>
 
-        {/* Sidebar */}
-        <div style={{ width: 230, background: "#fff", borderRight: "1px solid #f0f0f0", display: "flex", flexDirection: "column", padding: "24px 0", position: "sticky", top: 0, height: "100vh" }}>
+        {/* Mobile drawer backdrop */}
+        {mobileNavOpen && (
+          <div onClick={() => setMobileNavOpen(false)}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.40)", zIndex: 1099 }} />
+        )}
+
+        {/* Sidebar (off-canvas drawer on mobile) */}
+        <div className={`iq-sidebar${mobileNavOpen ? " iq-open" : ""}`} style={{ width: 230, background: "#fff", borderRight: "1px solid #f0f0f0", display: "flex", flexDirection: "column", padding: "24px 0", position: "sticky", top: 0, height: "100vh" }}>
           <div style={{ padding: "0 22px 28px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📋</div>
@@ -1149,7 +1196,7 @@ export default function AttendanceApp() {
           </div>
           <nav style={{ flex: 1, padding: "0 12px" }}>
             {navItems.map(item => (
-              <button key={item.id} onClick={() => setView(item.id)} style={{ width: "100%", textAlign: "left", padding: "11px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, fontWeight: 600, marginBottom: 2, transition: "all 0.15s", background: view === item.id ? "#f0f0ff" : "transparent", color: view === item.id ? "#6366f1" : "#666" }}>
+              <button key={item.id} onClick={() => { setView(item.id); setMobileNavOpen(false); }} style={{ width: "100%", textAlign: "left", padding: "11px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, fontWeight: 600, marginBottom: 2, transition: "all 0.15s", background: view === item.id ? "#f0f0ff" : "transparent", color: view === item.id ? "#6366f1" : "#666" }}>
                 <span style={{ fontSize: 15 }}>{item.icon}</span>
                 {item.label}
                 {item.id === "organizers" && <span style={{ marginLeft: "auto", background: "#6366f1", color: "#fff", borderRadius: 99, fontSize: 10, fontWeight: 800, padding: "1px 7px" }}>NEW</span>}
@@ -1166,7 +1213,16 @@ export default function AttendanceApp() {
         </div>
 
         {/* Main content */}
-        <div style={{ flex: 1, padding: 32, overflowY: "auto", maxHeight: "100vh" }}>
+        <div className="iq-content" style={{ flex: 1, padding: 32, overflowY: "auto", maxHeight: "100vh" }}>
+          {/* Mobile top bar (hidden on desktop via CSS) */}
+          <div className="iq-topbar" style={{ alignItems: "center", gap: 12, marginBottom: 18, paddingBottom: 14, borderBottom: "1px solid #f0f0f0", position: "sticky", top: 0, background: "#f7f7f8", zIndex: 50 }}>
+            <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu"
+              style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #eee", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "#333", flexShrink: 0 }}>☰</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>📋</div>
+              <span style={{ fontWeight: 900, fontSize: 15, color: "#111", fontFamily: "'Playfair Display', serif" }}>AttendIQ</span>
+            </div>
+          </div>
           {view === "organizers" && <OrganizersView />}
           {view === "dashboard"  && <Dashboard students={students} events={events} attendance={attendance} loading={loading} />}
           {view === "events"     && <EventsView events={events} setEvents={setEvents} students={students} attendance={attendance} setAttendance={setAttendance} apiAvailable={apiAvailable} orgId={ORG_ID} />}
