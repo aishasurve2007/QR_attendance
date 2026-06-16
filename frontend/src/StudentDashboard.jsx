@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import QRCodeLib from "qrcode";
+import StudentClassesView from "./StudentClassesView.jsx";
 
 const BASE_URL = "https://attendiq-api.onrender.com/api/v1";
 
@@ -282,9 +283,9 @@ export default function StudentDashboard({ onLogout }) {
       border: "1px solid #f0f0f0", boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
       padding: 24, marginBottom: 16,
     },
-    statRow: { display: "flex", gap: 12, marginBottom: 20 },
+    statRow: { display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" },
     stat: {
-      flex: 1, background: "#fff", borderRadius: 12,
+      flex: "1 1 100px", background: "#fff", borderRadius: 12,
       border: "1px solid #f0f0f0", padding: "16px 18px",
     },
     logoutBtn: {
@@ -299,25 +300,33 @@ export default function StudentDashboard({ onLogout }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700;800&display=swap');
         * { box-sizing: border-box; }
+        @media (max-width: 480px) {
+          .iq-content { padding: 16px 12px !important; }
+          .iq-content h2 { font-size: 20px !important; }
+          .iq-content select { width: 100% !important; }
+          .iq-stu-header { padding: 0 14px !important; }
+          .iq-stu-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        }
       `}</style>
 
-      <div style={s.header}>
+      <div className="iq-stu-header" style={s.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📋</div>
           <span style={{ fontWeight: 900, fontSize: 15, color: "#111", fontFamily: "'Playfair Display', serif" }}>AttendIQ</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: "50%", background: `hsl(${hue},60%,88%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: `hsl(${hue},50%,35%)` }}>{initial}</div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#555" }}>{studentName}</span>
+          <span className="iq-stu-name" style={{ fontSize: 13, fontWeight: 600, color: "#555" }}>{studentName}</span>
           <button style={s.logoutBtn} onClick={onLogout}>Sign out</button>
         </div>
       </div>
 
-      <div style={s.content}>
+      <div className="iq-content" style={s.content}>
         <div style={s.tabs}>
           <button style={s.tab(activeTab === "home")}     onClick={() => setActiveTab("home")}>🏠 Home</button>
           <button style={s.tab(activeTab === "events")}   onClick={() => setActiveTab("events")}>📅 All Events</button>
           <button style={s.tab(activeTab === "history")}  onClick={() => setActiveTab("history")}>✅ My Attendance</button>
+          <button style={s.tab(activeTab === "classes")}  onClick={() => setActiveTab("classes")}>📚 My Classes</button>
           <button style={s.tab(activeTab === "qr")}       onClick={() => setActiveTab("qr")}>🔲 My QR Code</button>
           <button style={s.tab(activeTab === "security")} onClick={() => { setActiveTab("security"); setPwError(null); setPwSuccess(false); }}>🔐 Security</button>
         </div>
@@ -429,6 +438,10 @@ export default function StudentDashboard({ onLogout }) {
         )}
 
         {/* ── QR CODE ── */}
+        {!loading && activeTab === "classes" && (
+          <StudentClassesView studentId={studentId} orgId={orgId} groupLabel={profile?.group_label} />
+        )}
+
         {!loading && activeTab === "qr" && (
           <div style={{ ...s.card, textAlign: "center" }}>
             <div style={{ fontSize: 17, fontWeight: 800, fontFamily: "'Playfair Display', serif", marginBottom: 6, color: "#111" }}>Your QR Code</div>

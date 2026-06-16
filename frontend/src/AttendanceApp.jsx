@@ -325,7 +325,7 @@ function OrganizersView() {
         </div>
       ) : (
         <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0f0f0", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <table className="iq-reflow" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#fafafa", borderBottom: "2px solid #f0f0f0" }}>
                 {["Organizer", "Events Created", "Status", "Joined", "Actions"].map(h => (
@@ -340,7 +340,7 @@ function OrganizersView() {
                 <tr key={org.id} style={{ borderBottom: "1px solid #f8f8f8" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "14px 18px" }}>
+                  <td className="iq-rf-title" style={{ padding: "14px 18px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 34, height: 34, borderRadius: "50%", background: `hsl(${org.email.charCodeAt(0) * 7},60%,88%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: `hsl(${org.email.charCodeAt(0) * 7},50%,35%)` }}>
                         {org.email[0].toUpperCase()}
@@ -348,18 +348,18 @@ function OrganizersView() {
                       <span style={{ fontWeight: 600, color: "#111" }}>{org.email}</span>
                     </div>
                   </td>
-                  <td style={{ padding: "14px 18px" }}>
+                  <td data-label="Events" style={{ padding: "14px 18px" }}>
                     <button onClick={() => handleViewEvents(org)} style={{ background: "none", border: "none", cursor: "pointer", color: "#6366f1", fontWeight: 700, fontSize: 13, fontFamily: "inherit", padding: 0 }}>
                       {org.event_count} event{org.event_count !== 1 ? "s" : ""} →
                     </button>
                   </td>
-                  <td style={{ padding: "14px 18px" }}>
+                  <td data-label="Status" style={{ padding: "14px 18px" }}>
                     <Badge color={org.is_active ? "green" : "red"}>{org.is_active ? "Active" : "Inactive"}</Badge>
                   </td>
-                  <td style={{ padding: "14px 18px", color: "#888", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
+                  <td data-label="Joined" style={{ padding: "14px 18px", color: "#888", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
                     {formatDate(org.created_at)}
                   </td>
-                  <td style={{ padding: "14px 18px" }}>
+                  <td data-label="Actions" style={{ padding: "14px 18px" }}>
                     <div style={{ display: "flex", gap: 8 }}>
                       <Btn small variant="ghost" onClick={() => { setShowReset(org); setResetForm({ newPw: "", confirmPw: "" }); setResetMsg(null); }}>Reset PW</Btn>
                       <Btn small variant={org.is_active ? "danger" : "success"} onClick={() => handleToggleActive(org)}>
@@ -461,7 +461,7 @@ function Dashboard({ students, events, attendance, loading }) {
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", gridColumn: "1 / -1" }}>
           <h4 style={{ margin: "0 0 18px", fontFamily: "'Playfair Display', serif", fontSize: 17 }}>Recent Check-ins</h4>
           {loading ? <TableSkeleton rows={5} cols={4} /> : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <table className="iq-reflow" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead><tr style={{ borderBottom: "2px solid #f0f0f0" }}>{[attendeeLabel, "Event", "Time", "Status"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 12px", color: "#aaa", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>)}</tr></thead>
               <tbody>{recentAtt.map((a) => {
                 const stu = students.find(s => s.id === (a.studentId || a.attendee_id));
@@ -469,10 +469,10 @@ function Dashboard({ students, events, attendance, loading }) {
                 const ts = a.time || a.checked_in_at;
                 return (
                   <tr key={a.id} style={{ borderBottom: "1px solid #f8f8f8" }} onMouseEnter={e => e.currentTarget.style.background = "#fafafa"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <td style={{ padding: "12px 12px" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "50%", background: `hsl(${(stu?.name?.charCodeAt(0) || 65) * 5}, 60%, 88%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: `hsl(${(stu?.name?.charCodeAt(0) || 65) * 5}, 50%, 35%)` }}>{stu?.name?.[0]}</div><span style={{ fontWeight: 600, color: "#222" }}>{stu?.name || "Unknown"}</span></div></td>
-                    <td style={{ padding: "12px 12px", color: "#555" }}>{evt?.name || "Unknown"}</td>
-                    <td style={{ padding: "12px 12px", color: "#888", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{formatDate(ts)} {formatTime(ts)}</td>
-                    <td style={{ padding: "12px 12px" }}><Badge color="green">Present</Badge></td>
+                    <td className="iq-rf-title" style={{ padding: "12px 12px" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "50%", background: `hsl(${(stu?.name?.charCodeAt(0) || 65) * 5}, 60%, 88%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: `hsl(${(stu?.name?.charCodeAt(0) || 65) * 5}, 50%, 35%)` }}>{stu?.name?.[0]}</div><span style={{ fontWeight: 600, color: "#222" }}>{stu?.name || "Unknown"}</span></div></td>
+                    <td data-label="Event" style={{ padding: "12px 12px", color: "#555" }}>{evt?.name || "Unknown"}</td>
+                    <td data-label="Time" style={{ padding: "12px 12px", color: "#888", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{formatDate(ts)} {formatTime(ts)}</td>
+                    <td data-label="Status" style={{ padding: "12px 12px" }}><Badge color="green">Present</Badge></td>
                   </tr>
                 );
               })}</tbody>
@@ -707,18 +707,18 @@ function StudentsView({ students, setStudents, attendance, events, loading, apiA
         </select>
       </div>
       <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0f0f0", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <table className="iq-reflow" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#fafafa", borderBottom: "2px solid #f0f0f0" }}>{[attendeeLabel, identifierLabel, groupLabel, "Events Attended", "QR Code"].map(h => <th key={h} style={{ textAlign: "left", padding: "14px 18px", color: "#aaa", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>)}</tr></thead>
           <tbody>
             {loading ? <tr><td colSpan={5}><TableSkeleton rows={5} cols={5} /></td></tr> : filteredStudents.map(s => {
               const evtCount = attendance.filter(a => (a.studentId || a.attendee_id) === s.id).length;
               return (
                 <tr key={s.id} style={{ borderBottom: "1px solid #f8f8f8" }} onMouseEnter={e => e.currentTarget.style.background = "#fafafa"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "14px 18px" }}><div style={{ display: "flex", alignItems: "center", gap: 12 }}><div style={{ width: 36, height: 36, borderRadius: "50%", background: `hsl(${s.name.charCodeAt(0) * 5}, 60%, 88%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: `hsl(${s.name.charCodeAt(0) * 5}, 50%, 35%)` }}>{s.name[0]}</div><div><div style={{ fontWeight: 700, color: "#111" }}>{s.name}</div><div style={{ fontSize: 11, color: "#bbb", marginTop: 1 }}>{s.email}</div></div></div></td>
-                  <td style={{ padding: "14px 18px", fontFamily: "'DM Mono', monospace", color: "#555", fontSize: 12 }}>{s.roll || s.identifier}</td>
-                  <td style={{ padding: "14px 18px" }}><Badge color={deptColors[s.dept || s.group_label] || "blue"}>{s.dept || s.group_label}</Badge></td>
-                  <td style={{ padding: "14px 18px" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, fontSize: 16, color: "#333" }}>{evtCount}</span><span style={{ fontSize: 11, color: "#aaa" }}>events</span></div></td>
-                  <td style={{ padding: "14px 18px" }}>
+                  <td className="iq-rf-title" style={{ padding: "14px 18px" }}><div style={{ display: "flex", alignItems: "center", gap: 12 }}><div style={{ width: 36, height: 36, borderRadius: "50%", background: `hsl(${s.name.charCodeAt(0) * 5}, 60%, 88%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: `hsl(${s.name.charCodeAt(0) * 5}, 50%, 35%)` }}>{s.name[0]}</div><div><div style={{ fontWeight: 700, color: "#111" }}>{s.name}</div><div style={{ fontSize: 11, color: "#bbb", marginTop: 1 }}>{s.email}</div></div></div></td>
+                  <td data-label={identifierLabel} style={{ padding: "14px 18px", fontFamily: "'DM Mono', monospace", color: "#555", fontSize: 12 }}>{s.roll || s.identifier}</td>
+                  <td data-label={groupLabel} style={{ padding: "14px 18px" }}><Badge color={deptColors[s.dept || s.group_label] || "blue"}>{s.dept || s.group_label}</Badge></td>
+                  <td data-label="Attended" style={{ padding: "14px 18px" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, fontSize: 16, color: "#333" }}>{evtCount}</span><span style={{ fontSize: 11, color: "#aaa" }}>events</span></div></td>
+                  <td data-label="QR" style={{ padding: "14px 18px" }}>
   <div style={{ display: "flex", gap: 8 }}>
     <Btn small variant="ghost" onClick={() => setShowQR(s)}>View QR</Btn>
     <Btn small variant="danger" onClick={() => handleDeleteStudent(s.id)}>Remove</Btn>
@@ -810,12 +810,12 @@ function ReportsView({ students, events, attendance, loading, orgId, apiAvailabl
         {loading ? Array(3).fill(0).map((_, i) => <div key={i} className="iq-stat" style={{ flex: "1 1 160px", background: "#fff", borderRadius: 16, padding: "20px 24px", border: "1px solid #f0f0f0" }}><Skeleton height={40} /></div>) : <><StatCard icon="📋" label="Records Shown" value={filtered.length} accent="#6366f1" /><StatCard icon="🎓" label={`Unique ${attendeeLabel}s`} value={new Set(filtered.map(a => a.studentId || a.attendee_id)).size} accent="#10b981" /><StatCard icon="📅" label="Events Covered" value={new Set(filtered.map(a => a.eventId || a.event_id)).size} accent="#f59e0b" /></>}
       </div>
       <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0f0f0", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <table className="iq-reflow" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#fafafa", borderBottom: "2px solid #f0f0f0" }}>{[attendeeLabel, identifierLabel, groupLabel, "Event", "Check-in Time"].map(h => <th key={h} style={{ textAlign: "left", padding: "14px 18px", color: "#aaa", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>)}</tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={5}><TableSkeleton rows={5} cols={5} /></td></tr> : filtered.length === 0 ? <tr><td colSpan={5} style={{ padding: 40, textAlign: "center", color: "#ccc", fontSize: 14 }}>No records found</td></tr> : filtered.map(a => {
+            {loading ? <tr><td className="iq-rf-title" colSpan={5}><TableSkeleton rows={5} cols={5} /></td></tr> : filtered.length === 0 ? <tr><td data-label={identifierLabel} colSpan={5} style={{ padding: 40, textAlign: "center", color: "#ccc", fontSize: 14 }}>No records found</td></tr> : filtered.map(a => {
               const s = students.find(x => x.id === (a.studentId || a.attendee_id)); const e = events.find(x => x.id === (a.eventId || a.event_id)); const ts = a.time || a.checked_in_at;
-              return <tr key={a.id} style={{ borderBottom: "1px solid #f8f8f8" }} onMouseEnter={ev => ev.currentTarget.style.background = "#fafafa"} onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}><td style={{ padding: "12px 18px", fontWeight: 600, color: "#222" }}>{s?.name}</td><td style={{ padding: "12px 18px", fontFamily: "'DM Mono', monospace", color: "#888", fontSize: 12 }}>{s?.roll || s?.identifier}</td><td style={{ padding: "12px 18px", color: "#555" }}>{s?.dept || s?.group_label}</td><td style={{ padding: "12px 18px", color: "#555" }}>{e?.name}</td><td style={{ padding: "12px 18px", fontFamily: "'DM Mono', monospace", color: "#888", fontSize: 12 }}>{formatDate(ts)} {formatTime(ts)}</td></tr>;
+              return <tr key={a.id} style={{ borderBottom: "1px solid #f8f8f8" }} onMouseEnter={ev => ev.currentTarget.style.background = "#fafafa"} onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}><td data-label={groupLabel} style={{ padding: "12px 18px", fontWeight: 600, color: "#222" }}>{s?.name}</td><td data-label="Event" style={{ padding: "12px 18px", fontFamily: "'DM Mono', monospace", color: "#888", fontSize: 12 }}>{s?.roll || s?.identifier}</td><td data-label="Check-in" style={{ padding: "12px 18px", color: "#555" }}>{s?.dept || s?.group_label}</td><td style={{ padding: "12px 18px", color: "#555" }}>{e?.name}</td><td style={{ padding: "12px 18px", fontFamily: "'DM Mono', monospace", color: "#888", fontSize: 12 }}>{formatDate(ts)} {formatTime(ts)}</td></tr>;
             })}
           </tbody>
         </table>
@@ -1177,6 +1177,21 @@ export default function AttendanceApp() {
             .iq-content h2 { font-size: 20px !important; }
             .iq-modal { padding: 16px !important; }
             .iq-sidebar { width: 84vw !important; max-width: 300px; }  /* drawer not full-bleed */
+          }
+
+          /* Data tables -> stacked light-grey cards on phones (no horizontal scroll) */
+          @media (max-width: 600px) {
+            .iq-reflow { display: block !important; white-space: normal !important; overflow-x: visible !important; }
+            .iq-reflow thead { display: none; }
+            .iq-reflow tbody, .iq-reflow tr, .iq-reflow td { display: block; width: 100%; }
+            .iq-reflow tr { background: #fafafa !important; border: 1px solid #f0f0f0 !important; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+            .iq-reflow td { padding: 5px 0 !important; border: none !important; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left !important; }
+            .iq-reflow td::before { content: attr(data-label); font-weight: 700; color: #aaa; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
+            .iq-reflow td.iq-rf-title { display: block; font-weight: 800; font-size: 14px; color: #111; margin-bottom: 4px; padding-bottom: 8px !important; border-bottom: 1px solid #eee !important; }
+            .iq-reflow td.iq-rf-title::before { content: none; }
+            .iq-reflow td.iq-rf-x { display: none; }
+            .iq-reflow td[colspan] { display: block; }
+            .iq-reflow td[colspan]::before { content: none; }
           }
         `}</style>
 

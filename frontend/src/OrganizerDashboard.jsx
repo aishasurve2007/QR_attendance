@@ -37,7 +37,7 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+      <div className="iq-modal" style={{ background: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, fontFamily: "'Playfair Display', serif" }}>{title}</h3>
           <button onClick={onClose} style={{ background: "#f5f5f5", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", fontSize: 16 }}>×</button>
@@ -142,6 +142,7 @@ export default function OrganizerDashboard({ onLogout }) {
   const [attendance, setAttendance] = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [view,       setView]       = useState("events");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Event form
   const [showCreate, setShowCreate] = useState(false);
@@ -337,14 +338,52 @@ export default function OrganizerDashboard({ onLogout }) {
   ];
 
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#f7f7f8", minHeight: "100vh", display: "flex" }}>
+    <div className="iq-shell" style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#f7f7f8", minHeight: "100vh", display: "flex" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;600;700;800&display=swap');
         * { box-sizing: border-box; }
+
+        /* Mobile responsive (drawer pattern) */
+        .iq-topbar { display: none; }
+        @media (max-width: 768px) {
+          .iq-sidebar { position: fixed !important; top: 0; left: 0; height: 100vh !important; z-index: 1100; transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 0 0 50px rgba(0,0,0,0.20); }
+          .iq-sidebar.iq-open { transform: translateX(0); }
+          .iq-topbar { display: flex !important; }
+          .iq-content { padding: 16px !important; max-height: none !important; overflow: visible !important; }
+          .iq-grid-2 { grid-template-columns: 1fr !important; }
+          .iq-content table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+          .iq-modal { padding: 20px !important; }
+          .iq-content h2 { font-size: 22px !important; }
+        }
+        @media (max-width: 480px) {
+          .iq-content { padding: 12px !important; }
+          .iq-stat { flex: 1 1 100% !important; }
+          .iq-content select { width: 100% !important; min-width: 0 !important; }
+          .iq-content h2 { font-size: 20px !important; }
+          .iq-modal { padding: 16px !important; }
+          .iq-sidebar { width: 84vw !important; max-width: 300px; }
+        }
+        /* Data tables -> stacked light-grey cards on phones */
+        @media (max-width: 600px) {
+          .iq-reflow { display: block !important; white-space: normal !important; overflow-x: visible !important; }
+          .iq-reflow thead { display: none; }
+          .iq-reflow tbody, .iq-reflow tr, .iq-reflow td { display: block; width: 100%; }
+          .iq-reflow tr { background: #fafafa !important; border: 1px solid #f0f0f0 !important; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+          .iq-reflow td { padding: 5px 0 !important; border: none !important; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left !important; }
+          .iq-reflow td::before { content: attr(data-label); font-weight: 700; color: #aaa; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
+          .iq-reflow td.iq-rf-title { display: block; font-weight: 800; font-size: 14px; color: #111; margin-bottom: 4px; padding-bottom: 8px !important; border-bottom: 1px solid #eee !important; }
+          .iq-reflow td.iq-rf-title::before { content: none; }
+          .iq-reflow td[colspan] { display: block; }
+          .iq-reflow td[colspan]::before { content: none; }
+        }
       `}</style>
 
-      {/* ── Sidebar ── */}
-      <div style={{ width: 210, background: "#fff", borderRight: "1px solid #f0f0f0", display: "flex", flexDirection: "column", padding: "20px 0", position: "sticky", top: 0, height: "100vh" }}>
+      {mobileNavOpen && (
+        <div onClick={() => setMobileNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.40)", zIndex: 1099 }} />
+      )}
+
+      {/* Sidebar (drawer on mobile) */}
+      <div className={`iq-sidebar${mobileNavOpen ? " iq-open" : ""}`} style={{ width: 210, background: "#fff", borderRight: "1px solid #f0f0f0", display: "flex", flexDirection: "column", padding: "20px 0", position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ padding: "0 18px 24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📋</div>
@@ -357,7 +396,7 @@ export default function OrganizerDashboard({ onLogout }) {
 
         <nav style={{ flex: 1, padding: "0 10px" }}>
           {navItems.map(item => (
-            <button key={item.id} onClick={() => setView(item.id)} style={{
+            <button key={item.id} onClick={() => { setView(item.id); setMobileNavOpen(false); }} style={{
               width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: 9,
               border: "none", cursor: "pointer", fontFamily: "inherit",
               display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, marginBottom: 2,
@@ -376,15 +415,21 @@ export default function OrganizerDashboard({ onLogout }) {
         </div>
       </div>
 
-      {/* ── Main ── */}
-      
-      <div style={{ flex: 1, padding: 28, overflowY: "auto", maxHeight: "100vh" }}>
+      {/* Main */}
+      <div className="iq-content" style={{ flex: 1, padding: 28, overflowY: "auto", maxHeight: "100vh" }}>
+        <div className="iq-topbar" style={{ alignItems: "center", gap: 12, marginBottom: 18, paddingBottom: 14, borderBottom: "1px solid #f0f0f0", position: "sticky", top: 0, background: "#f7f7f8", zIndex: 50 }}>
+          <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #eee", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "#333", flexShrink: 0 }}>☰</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>📋</div>
+            <span style={{ fontWeight: 900, fontSize: 15, color: "#111", fontFamily: "'Playfair Display', serif" }}>AttendIQ</span>
+          </div>
+        </div>
 
         {/* ── MY EVENTS ── */}
         {view === "classes" && <ClassesView orgId={ORG_ID} />}
         {view === "events" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, fontFamily: "'Playfair Display', serif", color: "#111" }}>My Events</h2>
                 <p style={{ color: "#888", margin: "4px 0 0", fontSize: 13 }}>
@@ -444,7 +489,7 @@ export default function OrganizerDashboard({ onLogout }) {
               <p style={{ color: "#888", margin: "4px 0 0", fontSize: 13 }}>Check-ins across your events only</p>
             </div>
             <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f0f0f0", overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <table className="iq-reflow" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#fafafa", borderBottom: "2px solid #f0f0f0" }}>
                     {["Student","Roll No.","Dept","Event","Checked In At","Method"].map(h => (
@@ -461,12 +506,12 @@ export default function OrganizerDashboard({ onLogout }) {
                       <tr key={a.id} style={{ borderBottom: "1px solid #f8f8f8" }}
                         onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ padding: "12px 16px", fontWeight: 600, color: "#111" }}>{a.name}</td>
-                        <td style={{ padding: "12px 16px", color: "#888", fontFamily: "monospace", fontSize: 12 }}>{a.identifier}</td>
-                        <td style={{ padding: "12px 16px", color: "#666" }}>{a.group_label || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{evt?.name || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#888", fontSize: 12 }}>{a.checked_in_at ? `${formatDate(a.checked_in_at)} ${formatTime(a.checked_in_at)}` : "—"}</td>
-                        <td style={{ padding: "12px 16px" }}><Badge color="blue">{a.method || "manual"}</Badge></td>
+                        <td className="iq-rf-title" style={{ padding: "12px 16px", fontWeight: 600, color: "#111" }}>{a.name}</td>
+                        <td data-label="Roll No." style={{ padding: "12px 16px", color: "#888", fontFamily: "monospace", fontSize: 12 }}>{a.identifier}</td>
+                        <td data-label="Dept" style={{ padding: "12px 16px", color: "#666" }}>{a.group_label || "—"}</td>
+                        <td data-label="Event" style={{ padding: "12px 16px", color: "#555" }}>{evt?.name || "—"}</td>
+                        <td data-label="Checked In" style={{ padding: "12px 16px", color: "#888", fontSize: 12 }}>{a.checked_in_at ? `${formatDate(a.checked_in_at)} ${formatTime(a.checked_in_at)}` : "—"}</td>
+                        <td data-label="Method" style={{ padding: "12px 16px" }}><Badge color="blue">{a.method || "manual"}</Badge></td>
                       </tr>
                     );
                   })}
@@ -479,7 +524,7 @@ export default function OrganizerDashboard({ onLogout }) {
         {/* ── REPORTS ── */}
         {view === "reports" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, fontFamily: "'Playfair Display', serif", color: "#111" }}>Reports</h2>
                 <p style={{ color: "#888", margin: "4px 0 0", fontSize: 13 }}>Scoped to your events only</p>
@@ -512,7 +557,7 @@ export default function OrganizerDashboard({ onLogout }) {
             </div>
 
             <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f0f0f0", overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <table className="iq-reflow" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#fafafa", borderBottom: "2px solid #f0f0f0" }}>
                     {["Student","Roll No.","Dept","Event","Check-in Time"].map(h => (
@@ -527,11 +572,11 @@ export default function OrganizerDashboard({ onLogout }) {
                     const evt = events.find(e => e.id === a.event_id);
                     return (
                       <tr key={a.id} style={{ borderBottom: "1px solid #f8f8f8" }}>
-                        <td style={{ padding: "11px 16px", fontWeight: 600 }}>{a.name}</td>
-                        <td style={{ padding: "11px 16px", color: "#888", fontFamily: "monospace", fontSize: 12 }}>{a.identifier}</td>
-                        <td style={{ padding: "11px 16px", color: "#666" }}>{a.group_label || "—"}</td>
-                        <td style={{ padding: "11px 16px", color: "#555" }}>{evt?.name || "—"}</td>
-                        <td style={{ padding: "11px 16px", color: "#888", fontSize: 12 }}>{a.checked_in_at ? `${formatDate(a.checked_in_at)} ${formatTime(a.checked_in_at)}` : "—"}</td>
+                        <td className="iq-rf-title" style={{ padding: "11px 16px", fontWeight: 600 }}>{a.name}</td>
+                        <td data-label="Roll No." style={{ padding: "11px 16px", color: "#888", fontFamily: "monospace", fontSize: 12 }}>{a.identifier}</td>
+                        <td data-label="Dept" style={{ padding: "11px 16px", color: "#666" }}>{a.group_label || "—"}</td>
+                        <td data-label="Event" style={{ padding: "11px 16px", color: "#555" }}>{evt?.name || "—"}</td>
+                        <td data-label="Check-in" style={{ padding: "11px 16px", color: "#888", fontSize: 12 }}>{a.checked_in_at ? `${formatDate(a.checked_in_at)} ${formatTime(a.checked_in_at)}` : "—"}</td>
                       </tr>
                     );
                   })}
@@ -582,7 +627,7 @@ export default function OrganizerDashboard({ onLogout }) {
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={editId ? "Edit Event" : "New Event"}>
         {formError && <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>⚠️ {formError}</div>}
         <Input label="Event Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Tech Summit 2025" />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div className="iq-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Input label="Date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
           <Input label="Time" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
         </div>
